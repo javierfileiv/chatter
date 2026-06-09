@@ -1,0 +1,8 @@
+[package]
+name = "client"
+version = "0.1.0"
+edition = "2024"
+description = "Simple chatter client"
+
+[dependencies]
+clap = { version = "4.6.1", features = ["derive"] }

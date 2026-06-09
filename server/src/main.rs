@@ -1,0 +1,14 @@
+mod auth;
+mod core;
+mod network;
+
+use core::server;
+use tokio::net::TcpListener;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let listener = TcpListener::bind("127.0.0.1:8080").await?;
+
+    server::run(listener).await?;
+    Ok(())
+}
