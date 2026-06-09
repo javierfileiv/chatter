@@ -1,0 +1,8 @@
+[workspace]
+resolver = "2"
+members = ["client", "common", "server"]
+authors = ["Javier FILEIV <javier.fileiv@gmail.com>"]
+
+[workspace.dependencies]
+common = { path = "./common" }
+
