@@ -1,11 +1,11 @@
 use crate::auth::client;
-use crate::core::broker;
-use futures_util::{ Stream, StreamExt, Sink, SinkExt };
+use futures_util::{Sink, SinkExt, Stream, StreamExt};
 use std::net::SocketAddr;
-use tokio_tungstenite::tungstenite::{ Error, Message };
+use tokio_tungstenite::tungstenite::{Error, Message};
 
 pub async fn handle<S>(ws: S, addr: SocketAddr) -> ()
-    where S: Stream<Item = Result<Message, Error>> + Sink<Message>
+where
+    S: Stream<Item = Result<Message, Error>> + Sink<Message>,
 {
     client::authenticate("user", "password");
 

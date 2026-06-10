@@ -1,12 +1,10 @@
 use crate::network::connection;
-use common::protocol;
-use flexi_logger::{ Duplicate, FileSpec, Logger };
+use flexi_logger::{Duplicate, FileSpec, Logger};
+use log::{error, info, warn};
 use tokio::net::TcpListener;
 use tokio::signal;
-use tokio::sync::broadcast::channel;
 use tokio::task::JoinSet;
 use tokio_tungstenite::accept_async;
-use log::{ info, warn, error };
 
 pub async fn run(listener: TcpListener) -> Result<(), Box<dyn std::error::Error>> {
     let mut tasks = JoinSet::new();
@@ -14,7 +12,12 @@ pub async fn run(listener: TcpListener) -> Result<(), Box<dyn std::error::Error>
     Logger::try_with_str("info")?
         .format_for_files(flexi_logger::detailed_format)
         .format_for_stderr(flexi_logger::detailed_format)
-        .log_to_file(FileSpec::default().directory("logs").basename("server").suppress_timestamp()) 
+        .log_to_file(
+            FileSpec::default()
+                .directory("logs")
+                .basename("server")
+                .suppress_timestamp(),
+        )
         .append()
         .duplicate_to_stderr(Duplicate::Warn)
         .start()?;

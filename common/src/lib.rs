@@ -1,1 +1,2 @@
-pub mod protocol;
+pub mod errors;
+pub mod ws_messages;

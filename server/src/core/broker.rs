@@ -1,13 +1,5 @@
+pub fn _create_room() {}
 
+pub fn _register_client() {}
 
-pub fn create_room(){
-
-}
-
-pub fn register_client() {
-
-}
-
-pub async fn run(){
-    
-}
+pub async fn _run() {}

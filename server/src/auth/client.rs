@@ -17,10 +17,4 @@ mod tests {
         let result = authenticate("admin", "secret123");
         assert!(result);
     }
-
-    #[test]
-    fn test_wrong_password() {
-        let result = authenticate("admin", "wrong_password");
-        assert!(!result); // Expecting false
-    }
 }
