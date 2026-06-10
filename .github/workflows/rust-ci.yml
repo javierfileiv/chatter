@@ -1,0 +1,61 @@
+name: Rust CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  format:
+    name: Check Formatting
+    runs-on: ubuntu-latest
+    container:
+      image: rust:latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Rustfmt
+      run: rustup component add rustfmt
+
+    - name: Check formatting
+      run: cargo fmt -- --check
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    container:
+      image: rust:latest
+    needs: format
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Build
+      run: cargo build --verbose
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    container:
+      image: rust:latest
+    needs: build
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Run tests
+      run: cargo test --verbose
+
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+    container:
+      image: rust:latest
+    needs: build
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Clippy
+      run: rustup component add clippy
+
+    - name: Run Clippy
+      run: cargo clippy --all-targets --all-features -- -D warnings
