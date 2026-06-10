@@ -1,6 +1,7 @@
-use crate::network::connection;
+use super::broker;
+use super::connection;
 use flexi_logger::{Duplicate, FileSpec, Logger};
-use log::{error, info, warn};
+use log::info;
 use tokio::net::TcpListener;
 use tokio::signal;
 use tokio::task::JoinSet;
@@ -22,22 +23,23 @@ pub async fn run(listener: TcpListener) -> Result<(), Box<dyn std::error::Error>
         .duplicate_to_stderr(Duplicate::Warn)
         .start()?;
 
-    info!("Starting server");
-    warn!("A warning");
-    error!("An error!");
+    info!("Starting broker...");
+    let tx_broker = broker::init();
+    info!("Starting server on {}", listener.local_addr()?);
     loop {
         // Non blocking accept
-        // If new connection, create an async under tasks to handle it.
         // If ctrl+C is hit, let's join gracefully the spawned tasks.
         tokio::select! {
             Ok((stream, addr)) = listener.accept() => {
+                let tx_clone = tx_broker.clone();
+                info!("New connection from {addr}");
                 tasks.spawn(async move {
 
                     let Ok(ws) = accept_async(stream).await else {
                         eprintln!("{addr} failed to connect");
                         return;
                     };
-                    connection::handle(ws, addr).await;
+                    connection::handle(ws, addr, tx_clone).await;
                 });
             }
             _ = signal::ctrl_c() => {

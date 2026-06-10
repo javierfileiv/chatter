@@ -1,6 +1,5 @@
 mod auth;
 mod core;
-mod network;
 
 use core::server;
 use tokio::net::TcpListener;
