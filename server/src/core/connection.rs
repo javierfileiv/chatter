@@ -23,13 +23,13 @@ where
 
     client::authenticate(&username, &password);
 
-    let room = "games".to_string();
+    let room_name = "games".to_string();
     let (from_broker, _) = mpsc::unbounded_channel::<BrokerToClientMsg>();
 
     let broker_client = BrokerClient {
         user: username,
         addr,
-        room,
+        room_name,
         broker_to_client: from_broker,
     };
 
