@@ -1,6 +1,8 @@
 [workspace]
 resolver = "2"
 members = ["client", "common", "server"]
+
+[workspace.package]
 authors = ["Javier FILEIV <javier.fileiv@gmail.com>"]
 
 [workspace.dependencies]
