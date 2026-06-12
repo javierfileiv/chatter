@@ -9,7 +9,7 @@ fn fake_client(
     let (tx, rx) = mpsc::unbounded_channel();
     (
         BrokerClient {
-            user: user.to_string(),
+            str_id: user.to_string(),
             addr,
             room_name: room.to_string(),
             broker_to_client: tx,
@@ -39,13 +39,18 @@ async fn check_response(rx_from_client: &mut UnboundedReceiver<BrokerToClientMsg
             assert!(status, "Broker has not broadcasted message");
             println!("Broadcast Treated");
         }
+        Ok(Some(BrokerToClientMsg::Response(BrokerRsp::Disconnect { status }))) => {
+            println!("Disconnect Treated (status: {})", status);
+        }
         Ok(Some(BrokerToClientMsg::ChatMessage {
-            status,
             sender,
+            sender_name,
             text,
         })) => {
-            assert!(status, "Broker issue sending broadcast message");
-            println!("Received message from {}: {}", sender, text);
+            println!(
+                "Received message from {} (addr:{}): {}",
+                sender_name, sender, text
+            );
         }
         Ok(Some(BrokerToClientMsg::Notification(text))) => {
             println!("Received notification: {}", text);
@@ -73,25 +78,18 @@ async fn test_broker_connection_success() {
     check_response(&mut rx).await;
 }
 
-#[ignore = "reason: Broadcast not implemented yet and todo! makes it panic"]
 #[tokio::test]
 async fn test_broker_broadcast_success() {
     let tx_broker = init();
     let addr: SocketAddr = "127.0.0.1:8080".parse().unwrap();
     let (client, mut rx) = fake_client(addr, "Alice", "games");
 
-    let result = tx_broker.send(BrokerEvent::Connect { client });
-
-    assert!(
-        result.is_ok(),
-        "The Broker should have received the Connected event"
-    );
+    tx_broker.send(BrokerEvent::Connect { client }).unwrap();
     check_response(&mut rx).await;
 
-    let test_message = Message::Text("Hello World".into());
     let result = tx_broker.send(BrokerEvent::Broadcast {
         sender_addr: addr,
-        message: test_message,
+        str_message: "Hello World".into(),
     });
 
     assert!(
@@ -99,6 +97,133 @@ async fn test_broker_broadcast_success() {
         "The Broker should have received the Broadcast event"
     );
     check_response(&mut rx).await;
+}
+
+#[tokio::test]
+async fn broadcast_to_multiple_clients_in_same_room() {
+    let tx_broker = init();
+    let addr_alice: SocketAddr = "127.0.0.1:6001".parse().unwrap();
+    let addr_bob: SocketAddr = "127.0.0.1:6002".parse().unwrap();
+
+    let (alice, mut rx_alice) = fake_client(addr_alice, "Alice", "games");
+    let (bob, mut rx_bob) = fake_client(addr_bob, "Bob", "games");
+
+    tx_broker
+        .send(BrokerEvent::Connect { client: alice })
+        .unwrap();
+    check_response(&mut rx_alice).await;
+
+    tx_broker
+        .send(BrokerEvent::Connect { client: bob })
+        .unwrap();
+    check_response(&mut rx_bob).await;
+
+    tx_broker
+        .send(BrokerEvent::Broadcast {
+            sender_addr: addr_alice,
+            str_message: "Hi everyone!".into(),
+        })
+        .unwrap();
+
+    // Alice should receive broadcast ack
+    let resp = tokio::time::timeout(std::time::Duration::from_millis(100), rx_alice.recv()).await;
+    match resp {
+        Ok(Some(BrokerToClientMsg::Response(BrokerRsp::Broadcast { status }))) => {
+            assert!(status, "Broadcast ack should be true");
+        }
+        other => panic!("Alice expected broadcast ack, got {:?}", other),
+    }
+
+    // Bob should receive Alice's chat message
+    let resp = tokio::time::timeout(std::time::Duration::from_millis(100), rx_bob.recv()).await;
+    match resp {
+        Ok(Some(BrokerToClientMsg::ChatMessage {
+            sender_name, text, ..
+        })) => {
+            assert_eq!(sender_name, "Alice");
+            assert_eq!(text.to_string(), "Hi everyone!");
+        }
+        other => panic!("Bob expected chat message from Alice, got {:?}", other),
+    }
+}
+
+#[tokio::test]
+async fn broadcast_only_sender_in_room() {
+    let tx_broker = init();
+    let addr: SocketAddr = "127.0.0.1:6003".parse().unwrap();
+    let (client, mut rx) = fake_client(addr, "Solo", "empty");
+
+    tx_broker.send(BrokerEvent::Connect { client }).unwrap();
+    check_response(&mut rx).await;
+
+    tx_broker
+        .send(BrokerEvent::Broadcast {
+            sender_addr: addr,
+            str_message: "Nobody here".into(),
+        })
+        .unwrap();
+
+    // Sender should receive broadcast ack
+    let resp = tokio::time::timeout(std::time::Duration::from_millis(100), rx.recv()).await;
+    match resp {
+        Ok(Some(BrokerToClientMsg::Response(BrokerRsp::Broadcast { status }))) => {
+            assert!(
+                status,
+                "Broadcast ack should be true even with no other clients"
+            );
+        }
+        other => panic!("Expected broadcast ack, got {:?}", other),
+    }
+
+    // No more messages should arrive (sender doesn't get their own message)
+    let resp = tokio::time::timeout(std::time::Duration::from_millis(100), rx.recv()).await;
+    assert!(
+        resp.is_err(),
+        "No second message expected, sender should not receive own broadcast"
+    );
+}
+
+#[tokio::test]
+async fn broadcast_does_not_cross_rooms() {
+    let tx_broker = init();
+    let addr_alice: SocketAddr = "127.0.0.1:6004".parse().unwrap();
+    let addr_bob: SocketAddr = "127.0.0.1:6005".parse().unwrap();
+
+    let (alice, mut rx_alice) = fake_client(addr_alice, "Alice", "room_a");
+    let (bob, mut rx_bob) = fake_client(addr_bob, "Bob", "room_b");
+
+    tx_broker
+        .send(BrokerEvent::Connect { client: alice })
+        .unwrap();
+    check_response(&mut rx_alice).await;
+
+    tx_broker
+        .send(BrokerEvent::Connect { client: bob })
+        .unwrap();
+    check_response(&mut rx_bob).await;
+
+    tx_broker
+        .send(BrokerEvent::Broadcast {
+            sender_addr: addr_alice,
+            str_message: "Wrong room!".into(),
+        })
+        .unwrap();
+
+    // Alice gets ack
+    let resp = tokio::time::timeout(std::time::Duration::from_millis(100), rx_alice.recv()).await;
+    match resp {
+        Ok(Some(BrokerToClientMsg::Response(BrokerRsp::Broadcast { status }))) => {
+            assert!(status);
+        }
+        other => panic!("Alice expected broadcast ack, got {:?}", other),
+    }
+
+    // Bob should NOT receive anything
+    let resp = tokio::time::timeout(std::time::Duration::from_millis(100), rx_bob.recv()).await;
+    assert!(
+        resp.is_err(),
+        "Bob should not receive messages from a different room"
+    );
 }
 
 #[tokio::test]
