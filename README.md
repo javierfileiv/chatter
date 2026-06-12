@@ -6,7 +6,7 @@ A real-time chat application built with Rust, using WebSocket for client-server 
 
 ## Features
 
-- WebSocket-based real-time messaging (partial — broadcast routing in progress)
+- WebSocket-based real-time messaging
 - Multi-room support via a central message broker
 - User authentication (stub — always accepts)
 - Async I/O with Tokio
@@ -17,7 +17,7 @@ A real-time chat application built with Rust, using WebSocket for client-server 
 chatter/
 ├── client/                     # CLI client crate (stub)
 │   ├── src/main.rs             #   Currently prints "Hello, world!"
-│   └── Cargo.toml              #   edition = "2024", depends on clap
+│   └── Cargo.toml              #   edition = "2021", depends on clap
 ├── common/                     # Shared library crate
 │   ├── src/lib.rs              #   Re-exports errors and ws_messages
 │   ├── src/ws_messages.rs      #   Serde structs: AuthenticateUser, SendMessage, Logout
@@ -125,10 +125,9 @@ cargo test -p common      # Common crate only
 
 ### Known Gaps
 
-- **Broadcast** — `server/src/core/broker.rs` has `todo!()` in the broadcast path; the corresponding test is `#[ignore]`d.
-- **Room join** — `JoinRoom` event also contains `todo!()` for sending notifications back to clients.
 - **Connection handler** — hardcodes username/password/room instead of deserializing the first WebSocket frame via `common::ws_messages`.
 - **Auth** — `server/src/auth/client.rs` always returns `true`.
+- **Disconnect** — broker logs disconnect events but does not clean up clients/rooms yet.
 - **Client** — `client/src/main.rs` is a stub; the previous TCP-based implementation is commented out.
 - **CI** — The pre-commit hooks provide local enforcement, but no CI workflow file exists (`.github/workflows/` is empty).
 - **`server/src/core/DONT_COMMITbroker_test.rs`** — stale duplicate of broker logic; keep as-is, do not modify.

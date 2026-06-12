@@ -1,5 +1,5 @@
 #[cfg(test)]
-mod tests;
+mod broker_tests;
 
 use log::{error, info, warn};
 use std::collections::HashMap;
@@ -11,7 +11,7 @@ use tokio_tungstenite::tungstenite::Message;
 #[derive(Debug, Clone)]
 pub struct BrokerClient {
     /// Client username
-    pub user: String,
+    pub str_id: String,
     /// Address of the connected client
     pub addr: SocketAddr,
     /// Room the client has joined to
@@ -20,6 +20,34 @@ pub struct BrokerClient {
     pub broker_to_client: mpsc::UnboundedSender<BrokerToClientMsg>,
 }
 
+impl BrokerClient {
+    pub fn send_response(&self, rsp: BrokerRsp) {
+        if let Err(e) = self
+            .broker_to_client
+            .send(BrokerToClientMsg::new_response(rsp))
+        {
+            error!(
+                "Failed to send response to client: {} ( addr {}): {}",
+                self.str_id, self.addr, e
+            );
+        }
+    }
+    pub fn send_message(&self, sender_client: &BrokerClient, msg: &str) {
+        if let Err(e) = self
+            .broker_to_client
+            .send(BrokerToClientMsg::new_chat_message(
+                sender_client.addr,
+                sender_client.str_id.clone(),
+                Message::Text(msg.to_owned().into()),
+            ))
+        {
+            error!(
+                "Failed to send broadcast from client ({} (addr:{})) to client ({} (addr:{}) : {}",
+                sender_client.str_id, sender_client.addr, self.str_id, self.addr, e
+            );
+        }
+    }
+}
 /// Internal broker events used by clients
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
@@ -35,8 +63,8 @@ pub enum BrokerEvent {
     Broadcast {
         /// Sender address
         sender_addr: SocketAddr,
-        /// Message to broadcast
-        message: Message,
+        /// Message to broadcast in String format
+        str_message: String,
     },
     /// Event for joining or createing a new room
     JoinRoom {
@@ -56,6 +84,8 @@ pub enum BrokerRsp {
         /// Final status
         status: bool,
     },
+    /// Response for when a client disconnects
+    Disconnect { status: bool },
     /// Response for broadcasting a message to all clients
     Broadcast {
         /// Final status
@@ -78,14 +108,28 @@ pub enum BrokerToClientMsg {
     Response(BrokerRsp),
     /// A chat message from other user
     ChatMessage {
-        /// Message status
-        status: bool,
         /// Sender address
         sender: SocketAddr,
-        /// Message text
-        text: String,
+        /// Sender user name
+        sender_name: String,
+        /// Tungstenite Message for WebSocket
+        text: Message,
     },
     Notification(String),
+}
+
+impl BrokerToClientMsg {
+    pub fn new_response(rsp: BrokerRsp) -> Self {
+        Self::Response(rsp)
+    }
+
+    pub fn new_chat_message(sender: SocketAddr, sender_name: String, text: Message) -> Self {
+        Self::ChatMessage {
+            sender,
+            sender_name,
+            text,
+        }
+    }
 }
 
 /// Internal enumeration for join a room
@@ -134,13 +178,13 @@ fn join_room(ctx: &mut Broker, joining_client: JoinRoomType, room_name: String) 
         JoinRoomType::FirstConnect(mut client) => {
             info!(
                 "Adding user {} (addr {}) to broker",
-                client.user, client.addr
+                client.str_id, client.addr
             );
 
             if ctx.clients.contains_key(&client.addr) {
                 warn!(
                     "Client {} existed in broker, invalid FirstConnect",
-                    client.user
+                    client.str_id
                 );
                 return (false, false);
             }
@@ -148,7 +192,7 @@ fn join_room(ctx: &mut Broker, joining_client: JoinRoomType, room_name: String) 
             let addr = client.addr;
             info!(
                 "Adding new client {} (addr {}) in broker",
-                client.user, addr
+                client.str_id, addr
             );
             client.room_name = room_name.clone();
 
@@ -164,12 +208,12 @@ fn join_room(ctx: &mut Broker, joining_client: JoinRoomType, room_name: String) 
                 }
             };
             if client.room_name == room_name {
-                info!("Client {} already in room {}", client.user, room_name);
+                info!("Client {} already in room {}", client.str_id, room_name);
                 return (false, false);
             }
             info!(
                 "Preparing to shift client {} from room {} to room{}",
-                client.user, client.room_name, room_name
+                client.str_id, client.room_name, room_name
             );
             // Remove client addr from client.room_name
             if let Some(addr_list) = ctx.rooms.get_mut(&client.room_name) {
@@ -198,9 +242,9 @@ fn join_room(ctx: &mut Broker, joining_client: JoinRoomType, room_name: String) 
 fn register_client(ctx: &mut Broker, client: BrokerClient) -> bool {
     info!(
         "Registering client: {} (addr:{}) to room: {}",
-        client.user, client.addr, client.room_name
+        client.str_id, client.addr, client.room_name
     );
-    let user_name = client.user.clone();
+    let user_name = client.str_id.clone();
     let room_name = client.room_name.clone();
     let (status, _) = join_room(ctx, JoinRoomType::FirstConnect(client), room_name);
 
@@ -217,21 +261,38 @@ pub async fn run(mut rx_events: mpsc::UnboundedReceiver<BrokerEvent>) {
     while let Some(event) = rx_events.recv().await {
         match event {
             BrokerEvent::Connect { client } => {
-                let reply_channel = client.broker_to_client.clone();
-                info!("Broker: Connected: {} {}", client.user, client.addr);
+                info!("Broker: Connected: {} {}", client.str_id, client.addr);
 
+                let rsp_channel = client.broker_to_client.clone();
                 let status = register_client(&mut ctx, client);
-                let rsp = BrokerToClientMsg::Response(BrokerRsp::Connect { status });
-                reply_channel.send(rsp).unwrap();
+                if let Err(e) =
+                    rsp_channel.send(BrokerToClientMsg::new_response(BrokerRsp::Connect {
+                        status,
+                    }))
+                {
+                    error!("Failed to send connect reply to client: {}", e);
+                }
             }
             BrokerEvent::Broadcast {
                 sender_addr,
-                message,
+                str_message,
             } => {
-                info!("Broker: Broadcast: {} {}", sender_addr, message);
-
-                let _rsp = BrokerToClientMsg::Response(BrokerRsp::Broadcast { status: true });
-                todo!("Implement fn to broadcast to all connected clients");
+                if let Some(sender_client) = ctx.clients.get(&sender_addr) {
+                    if let Some(addr_list) = ctx.rooms.get(&sender_client.room_name) {
+                        for &addr in addr_list.iter() {
+                            if addr != sender_client.addr {
+                                let broadcast_client = ctx.clients.get(&addr).unwrap();
+                                broadcast_client.send_message(sender_client, &str_message);
+                            }
+                        }
+                        sender_client.send_response(BrokerRsp::Broadcast { status: true });
+                    } else {
+                        error!(
+                            "This can't happen, room/addr_list was checked on Connect/JoinRoom events"
+                        );
+                        sender_client.send_response(BrokerRsp::Broadcast { status: false });
+                    }
+                }
             }
             BrokerEvent::JoinRoom {
                 sender_addr,
@@ -239,11 +300,10 @@ pub async fn run(mut rx_events: mpsc::UnboundedReceiver<BrokerEvent>) {
             } => {
                 let (status, created) =
                     join_room(&mut ctx, JoinRoomType::RoomMove(sender_addr), room_name);
-                let rsp = BrokerToClientMsg::Response(BrokerRsp::JoinRoom { status, created });
                 if let Some(client) = ctx.clients.get(&sender_addr) {
-                    let _ = client.broker_to_client.send(rsp);
+                    client.send_response(BrokerRsp::JoinRoom { status, created });
                 } else {
-                    info!("JoinRoom: no client at {sender_addr}, dropping response");
+                    warn!("JoinRoom: no client at {sender_addr}, dropping response");
                 }
             }
             BrokerEvent::Disconnect { addr } => {
