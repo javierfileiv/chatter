@@ -27,7 +27,7 @@ where
     let (from_broker, _) = mpsc::unbounded_channel::<BrokerToClientMsg>();
 
     let broker_client = BrokerClient {
-        user: username,
+        str_id: username,
         addr,
         room_name,
         broker_to_client: from_broker,
