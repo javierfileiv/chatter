@@ -59,8 +59,8 @@ pub enum ServerMessage {
     Chat { sender: String, message: String },
     // Server communicates something
     #[serde(rename = "notification")]
-    Notification(String),
+    Notification { value: String },
     // Some error sent in the server
     #[serde(rename = "error")]
-    Error(String),
+    Error { value: String },
 }
