@@ -158,6 +158,7 @@ where
     let reader = ws_half_reader(stream, broker_sender.clone(), addr);
     let writer = ws_half_writer(sink, broker_rx);
 
+    // we use select to drop one when the other dies.
     select! {
         _ = reader => info!("{addr} reader closed"),
         _ = writer => info!("{addr} writer closed"),
