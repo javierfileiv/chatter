@@ -1,5 +1,8 @@
 use super::*;
+use crate::core::broker::BrokerRsp;
+use futures::channel::mpsc as futures_mpsc;
 use futures::stream;
+use futures::StreamExt as _;
 use tokio_tungstenite::tungstenite::protocol::frame::CloseFrame;
 use tokio_tungstenite::tungstenite::Utf8Bytes;
 
@@ -197,4 +200,89 @@ async fn ws_half_reader_handles_multiple_messages_until_disconnect() {
     };
 
     assert!(rx.try_recv().is_err());
+}
+
+// Writer integration tests
+// Uses tokio::join! to avoid race conditions between sender and writer futures.
+// When going out of scope in the sender, the tx channel used to send the msg
+// is dropped. Because of that, depending on the execution runtime, it might
+// happen that the writer receives nothing.
+// Waiting for both futures using join avoid this.
+// The explicit drop(tx) is needed because the async block keeps tx alive
+// in its state machine until the future is fully dropped. Without explicit
+// drop, the writer's recv() never returns None and the while let loop in
+// ws_half_writer never finishes.
+
+#[tokio::test]
+async fn ws_half_writer_integration_chat_message() {
+    let (sink, mut receiver) = futures_mpsc::unbounded::<Message>();
+    let (tx, rx) = mpsc::unbounded_channel::<BrokerToClientMsg>();
+    let sender_addr = test_addr();
+
+    let writer = ws_half_writer(sink, rx);
+    let sender = async {
+        tx.send(BrokerToClientMsg::ChatMessage {
+            sender: sender_addr,
+            sender_name: "alice".to_string(),
+            text: "hello!".to_string(),
+        })
+        .unwrap();
+        drop(tx);
+    };
+    let recv = async {
+        let msg = receiver.next().await.unwrap();
+        match msg {
+            Message::Text(text) => {
+                let parsed: serde_json::Value = serde_json::from_str(&text).unwrap();
+                assert_eq!(parsed["type"], "chat");
+                assert_eq!(parsed["sender"], "alice");
+                assert_eq!(parsed["message"], "hello!");
+            }
+            other => panic!("expected Text message, got {other:?}"),
+        }
+    };
+
+    tokio::join!(writer, sender, recv);
+}
+
+#[tokio::test]
+async fn ws_half_writer_integration_notification() {
+    let (sink, mut receiver) = futures_mpsc::unbounded::<Message>();
+    let (tx, rx) = mpsc::unbounded_channel::<BrokerToClientMsg>();
+
+    let writer = ws_half_writer(sink, rx);
+    let sender = async {
+        tx.send(BrokerToClientMsg::Response(BrokerRsp::Broadcast {
+            status: true,
+        }))
+        .unwrap();
+        drop(tx);
+    };
+    let recv = async {
+        let msg = receiver.next().await.unwrap();
+        match msg {
+            Message::Text(text) => {
+                let parsed: serde_json::Value = serde_json::from_str(&text).unwrap();
+                assert_eq!(parsed["type"], "notification");
+                assert_eq!(parsed["value"], "Message sent");
+            }
+            other => panic!("expected Text message, got {other:?}"),
+        }
+    };
+
+    tokio::join!(writer, sender, recv);
+}
+
+#[tokio::test]
+async fn ws_half_writer_integration_shutdown() {
+    let (sink, mut receiver) = futures_mpsc::unbounded::<Message>();
+    let (_, rx) = mpsc::unbounded_channel::<BrokerToClientMsg>();
+
+    let writer = ws_half_writer(sink, rx);
+    let sender = async {};
+    let recv = async {
+        assert!(receiver.next().await.is_none());
+    };
+
+    tokio::join!(writer, sender, recv);
 }
