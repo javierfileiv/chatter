@@ -671,6 +671,7 @@ dependencies = [
  "flexi_logger",
  "futures-util",
  "log",
+ "serde_json",
  "tokio",
  "tokio-tungstenite",
  "tokio-util",
