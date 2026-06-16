@@ -30,7 +30,9 @@ chatter/
 │   ├── src/core.rs             #   Core module root
 │   ├── src/core/server.rs      #   Accept loop, spawns per-connection tasks
 │   ├── src/core/broker.rs      #   Central event loop: rooms, clients, routing
-│   ├── src/core/connection.rs  #   Per-connection WebSocket handler
+│   ├── src/core/connection.rs  #   Per-connection WebSocket handler, pure parsing functions
+│   ├── src/core/connection/    #   Connection module extras
+│   │   └── connection_tests.rs #   Unit tests for parse functions, ws_half_reader, and ws_half_writer
 │   └── Cargo.toml              #   edition = "2021"
 ├── Cargo.toml                  # Workspace manifest (3 members)
 ├── Cargo.lock
@@ -119,7 +121,7 @@ cargo fmt --all && cargo clippy --all-targets --all-features -- -D warnings
 
 ```bash
 cargo test --all          # Run all tests
-cargo test -p server      # Server crate only (includes broker tests)
+cargo test -p server      # Server crate only (includes broker + connection tests)
 cargo test -p common      # Common crate only
 ```
 

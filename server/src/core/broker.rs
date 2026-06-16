@@ -1,11 +1,11 @@
 #[cfg(test)]
 mod broker_tests;
 
+use common::ws_messages::ServerMessage;
 use log::{error, info, warn};
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use tokio::sync::mpsc;
-use tokio_tungstenite::tungstenite::Message;
 
 /// Internal broker client
 #[derive(Debug, Clone)]
@@ -38,7 +38,7 @@ impl BrokerClient {
             .send(BrokerToClientMsg::new_chat_message(
                 sender_client.addr,
                 sender_client.str_id.clone(),
-                Message::Text(msg.to_owned().into()),
+                msg.to_owned(),
             ))
         {
             error!(
@@ -113,7 +113,7 @@ pub enum BrokerToClientMsg {
         /// Sender user name
         sender_name: String,
         /// Tungstenite Message for WebSocket
-        text: Message,
+        text: String,
     },
     Notification(String),
 }
@@ -123,11 +123,98 @@ impl BrokerToClientMsg {
         Self::Response(rsp)
     }
 
-    pub fn new_chat_message(sender: SocketAddr, sender_name: String, text: Message) -> Self {
+    pub fn new_chat_message(sender: SocketAddr, sender_name: String, text: String) -> Self {
         Self::ChatMessage {
             sender,
             sender_name,
             text,
+        }
+    }
+}
+
+impl TryFrom<BrokerToClientMsg> for ServerMessage {
+    type Error = String;
+
+    fn try_from(msg: BrokerToClientMsg) -> Result<Self, String> {
+        match msg {
+            BrokerToClientMsg::Response(BrokerRsp::Connect { status }) => {
+                if status {
+                    Ok(ServerMessage::AuthResult {
+                        success: true,
+                        error: None,
+                    })
+                } else {
+                    Ok(ServerMessage::AuthResult {
+                        success: false,
+                        error: Some("Connection failed".to_string()),
+                    })
+                }
+            }
+            BrokerToClientMsg::Response(BrokerRsp::Disconnect { status }) => {
+                if status {
+                    Ok(ServerMessage::Notification {
+                        value: "Disconnected".to_string(),
+                    })
+                } else {
+                    Ok(ServerMessage::Error {
+                        value: "Disconnect failed".to_string(),
+                    })
+                }
+            }
+            BrokerToClientMsg::Response(BrokerRsp::Broadcast { status }) => {
+                if status {
+                    Ok(ServerMessage::Notification {
+                        value: "Message sent".to_string(),
+                    })
+                } else {
+                    Ok(ServerMessage::Error {
+                        value: "Broadcast failed".to_string(),
+                    })
+                }
+            }
+            BrokerToClientMsg::Response(BrokerRsp::JoinRoom { status, created }) => {
+                if status {
+                    let action = if created { "created" } else { "joined" };
+                    Ok(ServerMessage::Notification {
+                        value: format!("Room {}", action),
+                    })
+                } else {
+                    Ok(ServerMessage::Error {
+                        value: "Join room failed".to_string(),
+                    })
+                }
+            }
+            BrokerToClientMsg::ChatMessage {
+                sender_name, text, ..
+            } => Ok(ServerMessage::Chat {
+                sender: sender_name,
+                message: text,
+            }),
+            BrokerToClientMsg::Notification(text) => {
+                Ok(ServerMessage::Notification { value: text })
+            }
+        }
+    }
+}
+
+impl TryFrom<ServerMessage> for BrokerToClientMsg {
+    type Error = String;
+
+    fn try_from(msg: ServerMessage) -> Result<Self, Self::Error> {
+        match msg {
+            ServerMessage::AuthResult { success, error } => {
+                let status = success && error.is_none();
+                Ok(BrokerToClientMsg::Response(BrokerRsp::Connect { status }))
+            }
+            ServerMessage::Chat { sender, message } => Ok(BrokerToClientMsg::ChatMessage {
+                sender: SocketAddr::from(([0, 0, 0, 0], 0)),
+                sender_name: sender,
+                text: message,
+            }),
+            ServerMessage::Notification { value } => Ok(BrokerToClientMsg::Notification(value)),
+            ServerMessage::Error { value } => {
+                Ok(BrokerToClientMsg::Notification(format!("Error: {}", value)))
+            }
         }
     }
 }

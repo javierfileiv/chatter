@@ -4,25 +4,63 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AuthenticateUser {
     /// The client's username for login
-    username: String,
+    pub username: String,
     /// The client's password
-    password: String,
+    pub password: String,
     /// The client's room name to join or create if it doesn't exist
-    room_name: String,
+    pub room_name: String,
 }
 
 /// Socket message to broadcast content
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SendMessage {
     /// The client's username for display
-    username: String,
-    /// The message to send to the room.
-    message: String,
+    pub username: String,
+    /// The message to send to the room
+    pub message: String,
 }
 
 /// Socket message to logout client
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Logout {
-    /// The message to send to the room.
-    message: String,
+    /// Optional message to broadcast before leaving
+    pub message: String,
+}
+
+/// Messages the client can send to the server via WebSocket
+#[derive(Deserialize, Debug)]
+#[serde(tag = "type")]
+#[serde(deny_unknown_fields)]
+pub enum ClientMessage {
+    // Authentication msg
+    #[serde(rename = "authenticate")]
+    Authenticate(AuthenticateUser),
+    // Broadcast msg
+    #[serde(rename = "send")]
+    Broadcast(SendMessage),
+    // Logout msg
+    #[serde(rename = "logout")]
+    Logout(Logout),
+}
+
+/// Messages the server can send to the client via WebSocket
+#[derive(Serialize, Debug)]
+#[serde(tag = "type")]
+#[serde(deny_unknown_fields)]
+pub enum ServerMessage {
+    // Authentication response
+    #[serde(rename = "auth_result")]
+    AuthResult {
+        success: bool,
+        error: Option<String>,
+    },
+    // Broadcast response
+    #[serde(rename = "chat")]
+    Chat { sender: String, message: String },
+    // Server communicates something
+    #[serde(rename = "notification")]
+    Notification { value: String },
+    // Some error sent in the server
+    #[serde(rename = "error")]
+    Error { value: String },
 }
