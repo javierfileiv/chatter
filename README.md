@@ -32,7 +32,7 @@ chatter/
 │   ├── src/core/broker.rs      #   Central event loop: rooms, clients, routing
 │   ├── src/core/connection.rs  #   Per-connection WebSocket handler, pure parsing functions
 │   ├── src/core/connection/    #   Connection module extras
-│   │   └── connection_tests.rs #   Unit tests for parse functions only (for now)
+│   │   └── connection_tests.rs #   Unit tests for parse functions, ws_half_reader, and ws_half_writer
 │   └── Cargo.toml              #   edition = "2021"
 ├── Cargo.toml                  # Workspace manifest (3 members)
 ├── Cargo.lock
