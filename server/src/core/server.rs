@@ -7,6 +7,7 @@ use tokio::signal;
 use tokio::task::JoinSet;
 use tokio_tungstenite::accept_async;
 
+// Example taken from: https://websocket.org/guides/languages/rust/
 pub async fn run(listener: TcpListener) -> Result<(), Box<dyn std::error::Error>> {
     let mut tasks = JoinSet::new();
 
