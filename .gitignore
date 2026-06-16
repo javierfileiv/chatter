@@ -2,3 +2,4 @@ logs/
 target/
 .venv
 .history/
+__pycache__/
