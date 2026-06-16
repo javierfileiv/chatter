@@ -4,7 +4,6 @@ mod connection_tests;
 use crate::auth::client;
 use crate::core::broker::{BrokerClient, BrokerEvent, BrokerToClientMsg};
 use common::ws_messages::{AuthenticateUser, ClientMessage, ServerMessage};
-use futures_util::stream::SplitStream;
 use futures_util::{Sink, SinkExt, Stream, StreamExt};
 use log::{error, info, warn};
 use std::net::SocketAddr;
@@ -43,11 +42,11 @@ fn parse_broadcast_message(raw: &str, client_addr: SocketAddr) -> Option<BrokerE
 }
 
 async fn ws_half_reader<T>(
-    mut stream: SplitStream<T>,
+    mut stream: T,
     to_broker: UnboundedSender<BrokerEvent>,
     client_addr: SocketAddr,
 ) where
-    T: Stream<Item = Result<Message, Error>>,
+    T: Stream<Item = Result<Message, Error>> + Unpin,
 {
     while let Some(ws_msg) = stream.next().await {
         match ws_msg {

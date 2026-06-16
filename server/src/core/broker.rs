@@ -152,24 +152,36 @@ impl TryFrom<BrokerToClientMsg> for ServerMessage {
             }
             BrokerToClientMsg::Response(BrokerRsp::Disconnect { status }) => {
                 if status {
-                    Ok(ServerMessage::Notification("Disconnected".to_string()))
+                    Ok(ServerMessage::Notification {
+                        value: "Disconnected".to_string(),
+                    })
                 } else {
-                    Ok(ServerMessage::Error("Disconnect failed".to_string()))
+                    Ok(ServerMessage::Error {
+                        value: "Disconnect failed".to_string(),
+                    })
                 }
             }
             BrokerToClientMsg::Response(BrokerRsp::Broadcast { status }) => {
                 if status {
-                    Ok(ServerMessage::Notification("Message sent".to_string()))
+                    Ok(ServerMessage::Notification {
+                        value: "Message sent".to_string(),
+                    })
                 } else {
-                    Ok(ServerMessage::Error("Broadcast failed".to_string()))
+                    Ok(ServerMessage::Error {
+                        value: "Broadcast failed".to_string(),
+                    })
                 }
             }
             BrokerToClientMsg::Response(BrokerRsp::JoinRoom { status, created }) => {
                 if status {
                     let action = if created { "created" } else { "joined" };
-                    Ok(ServerMessage::Notification(format!("Room {}", action)))
+                    Ok(ServerMessage::Notification {
+                        value: format!("Room {}", action),
+                    })
                 } else {
-                    Ok(ServerMessage::Error("Join room failed".to_string()))
+                    Ok(ServerMessage::Error {
+                        value: "Join room failed".to_string(),
+                    })
                 }
             }
             BrokerToClientMsg::ChatMessage {
@@ -178,7 +190,9 @@ impl TryFrom<BrokerToClientMsg> for ServerMessage {
                 sender: sender_name,
                 message: text,
             }),
-            BrokerToClientMsg::Notification(text) => Ok(ServerMessage::Notification(text)),
+            BrokerToClientMsg::Notification(text) => {
+                Ok(ServerMessage::Notification { value: text })
+            }
         }
     }
 }
@@ -197,9 +211,9 @@ impl TryFrom<ServerMessage> for BrokerToClientMsg {
                 sender_name: sender,
                 text: message,
             }),
-            ServerMessage::Notification(text) => Ok(BrokerToClientMsg::Notification(text)),
-            ServerMessage::Error(text) => {
-                Ok(BrokerToClientMsg::Notification(format!("Error: {}", text)))
+            ServerMessage::Notification { value } => Ok(BrokerToClientMsg::Notification(value)),
+            ServerMessage::Error { value } => {
+                Ok(BrokerToClientMsg::Notification(format!("Error: {}", value)))
             }
         }
     }
