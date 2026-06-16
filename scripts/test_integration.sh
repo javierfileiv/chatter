@@ -15,9 +15,9 @@ echo "Using port $PORT"
 # 3. Clean logs from previous runs
 rm -f "$PROJECT_DIR/logs/server.log"
 
-# 4. Launch server in background
+# 4. Launch server in background (logs go to logs/server.log via flexi_logger)
 cd "$PROJECT_DIR"
-cargo run --bin server -- --port "$PORT" &
+cargo run --bin server -- --port "$PORT" >/dev/null 2>&1 &
 SERVER_PID=$!
 
 # Cleanup: always kill server on exit
@@ -31,7 +31,7 @@ trap cleanup EXIT
 # 5. Wait for server to be ready (10s max)
 echo "Waiting for server to be ready..."
 for i in $(seq 1 50); do
-    python3 -c "import socket; s=socket.socket(); s.connect(('127.0.0.1',$PORT)); s.close()" && break
+    python3 -c "import socket; s=socket.socket(); s.connect(('127.0.0.1',$PORT)); s.close()" 2>/dev/null && break
     sleep 0.2
 done
 
