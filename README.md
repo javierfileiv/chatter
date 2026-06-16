@@ -1,4 +1,5 @@
 [![Rust CI](https://github.com/javierfileiv/chatter/actions/workflows/rust-ci.yml/badge.svg)](https://github.com/javierfileiv/chatter/actions/workflows/rust-ci.yml)
+[![codecov](https://codecov.io/gh/javierfileiv/chatter/graph/badge.svg)](https://codecov.io/gh/javierfileiv/chatter)
 
 # Chatter
 
