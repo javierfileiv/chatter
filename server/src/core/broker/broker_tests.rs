@@ -364,3 +364,186 @@ async fn join_room_room_move_same_room_fails() {
         other => panic!("Unexpected response: {:?}", other),
     }
 }
+
+// TryFrom conversion tests
+
+mod tryfrom_tests {
+    use super::*;
+    use common::ws_messages::ServerMessage;
+
+    #[test]
+    fn tryfrom_broker_connect_success() {
+        let msg = BrokerToClientMsg::Response(BrokerRsp::Connect { status: true });
+        let result = ServerMessage::try_from(msg);
+        assert!(result.is_ok());
+        let result = result.unwrap();
+        assert!(matches!(
+            result,
+            ServerMessage::AuthResult {
+                success: true,
+                error: None
+            }
+        ));
+    }
+
+    #[test]
+    fn tryfrom_broker_connect_failure() {
+        let msg = BrokerToClientMsg::Response(BrokerRsp::Connect { status: false });
+        let result = ServerMessage::try_from(msg).unwrap();
+        assert!(matches!(
+            result,
+            ServerMessage::AuthResult { success: false, error: Some(ref e) } if e == "Connection failed"
+        ));
+    }
+
+    #[test]
+    fn tryfrom_broker_disconnect_success() {
+        let msg = BrokerToClientMsg::Response(BrokerRsp::Disconnect { status: true });
+        let result = ServerMessage::try_from(msg).unwrap();
+        assert!(matches!(
+            result,
+            ServerMessage::Notification { ref value } if value == "Disconnected"
+        ));
+    }
+
+    #[test]
+    fn tryfrom_broker_disconnect_failure() {
+        let msg = BrokerToClientMsg::Response(BrokerRsp::Disconnect { status: false });
+        let result = ServerMessage::try_from(msg).unwrap();
+        assert!(matches!(
+            result,
+            ServerMessage::Error { ref value } if value == "Disconnect failed"
+        ));
+    }
+
+    #[test]
+    fn tryfrom_broker_broadcast_success() {
+        let msg = BrokerToClientMsg::Response(BrokerRsp::Broadcast { status: true });
+        let result = ServerMessage::try_from(msg).unwrap();
+        assert!(matches!(
+            result,
+            ServerMessage::Notification { ref value } if value == "Message sent"
+        ));
+    }
+
+    #[test]
+    fn tryfrom_broker_broadcast_failure() {
+        let msg = BrokerToClientMsg::Response(BrokerRsp::Broadcast { status: false });
+        let result = ServerMessage::try_from(msg).unwrap();
+        assert!(matches!(
+            result,
+            ServerMessage::Error { ref value } if value == "Broadcast failed"
+        ));
+    }
+
+    #[test]
+    fn tryfrom_broker_joinroom_success_created() {
+        let msg = BrokerToClientMsg::Response(BrokerRsp::JoinRoom {
+            status: true,
+            created: true,
+        });
+        let result = ServerMessage::try_from(msg).unwrap();
+        assert!(matches!(
+            result,
+            ServerMessage::Notification { ref value } if value == "Room created"
+        ));
+    }
+
+    #[test]
+    fn tryfrom_broker_joinroom_success_joined() {
+        let msg = BrokerToClientMsg::Response(BrokerRsp::JoinRoom {
+            status: true,
+            created: false,
+        });
+        let result = ServerMessage::try_from(msg).unwrap();
+        assert!(matches!(
+            result,
+            ServerMessage::Notification { ref value } if value == "Room joined"
+        ));
+    }
+
+    #[test]
+    fn tryfrom_broker_joinroom_failure() {
+        let msg = BrokerToClientMsg::Response(BrokerRsp::JoinRoom {
+            status: false,
+            created: false,
+        });
+        let result = ServerMessage::try_from(msg).unwrap();
+        assert!(matches!(
+            result,
+            ServerMessage::Error { ref value } if value == "Join room failed"
+        ));
+    }
+
+    #[test]
+    fn tryfrom_broker_chat_message() {
+        let msg = BrokerToClientMsg::ChatMessage {
+            sender: "127.0.0.1:8080".parse().unwrap(),
+            sender_name: "alice".to_string(),
+            text: "hello".to_string(),
+        };
+        let result = ServerMessage::try_from(msg).unwrap();
+        assert!(matches!(
+            result,
+            ServerMessage::Chat { ref sender, ref message } if sender == "alice" && message == "hello"
+        ));
+    }
+
+    #[test]
+    fn tryfrom_broker_notification() {
+        let msg = BrokerToClientMsg::Notification("user left".to_string());
+        let result = ServerMessage::try_from(msg).unwrap();
+        assert!(matches!(
+            result,
+            ServerMessage::Notification { ref value } if value == "user left"
+        ));
+    }
+
+    #[test]
+    fn tryfrom_server_to_broker_auth_result() {
+        let msg = ServerMessage::AuthResult {
+            success: true,
+            error: None,
+        };
+        let result = BrokerToClientMsg::try_from(msg);
+        assert!(result.is_ok());
+        let result = result.unwrap();
+        assert!(matches!(
+            result,
+            BrokerToClientMsg::Response(BrokerRsp::Connect { status: true })
+        ));
+    }
+
+    #[test]
+    fn tryfrom_server_to_broker_chat() {
+        let msg = ServerMessage::Chat {
+            sender: "alice".to_string(),
+            message: "hello".to_string(),
+        };
+        let result = BrokerToClientMsg::try_from(msg).unwrap();
+        assert!(
+            matches!(result, BrokerToClientMsg::ChatMessage { ref sender_name, ref text, .. }
+            if sender_name == "alice" && text == "hello")
+        );
+    }
+
+    #[test]
+    fn tryfrom_server_to_broker_notification() {
+        let msg = ServerMessage::Notification {
+            value: "hello".to_string(),
+        };
+        let result = BrokerToClientMsg::try_from(msg).unwrap();
+        assert!(matches!(result, BrokerToClientMsg::Notification(ref text) if text == "hello"));
+    }
+
+    #[test]
+    fn tryfrom_server_to_broker_error() {
+        let msg = ServerMessage::Error {
+            value: "oops".to_string(),
+        };
+        let result = BrokerToClientMsg::try_from(msg).unwrap();
+        assert!(
+            matches!(result, BrokerToClientMsg::Notification(ref text) if text == "Error: oops")
+        );
+    }
+}
