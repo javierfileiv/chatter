@@ -154,7 +154,8 @@ async fn ws_half_reader_sends_disconnect_on_error() {
     assert!(matches!(event, BrokerEvent::Disconnect { addr: a } if a == addr));
 }
 
-// Receives fake authenticate type event when we are not waiting for it and verify we receive nothing.
+// Receives fake authenticate type event when we are not waiting for it and verify it is ignored.
+// When the stream ends, a Disconnect event is sent.
 #[tokio::test]
 async fn ws_half_reader_ignores_unexpected_authenticate() {
     let (tx, mut rx) = mpsc::unbounded_channel::<BrokerEvent>();
@@ -164,7 +165,9 @@ async fn ws_half_reader_ignores_unexpected_authenticate() {
     let stream = stream::iter(vec![Ok(Message::Text(json.into()))]);
     ws_half_reader(stream, tx, addr).await;
 
-    assert!(rx.recv().await.is_none());
+    // The authenticate message is ignored, but stream ending triggers disconnect.
+    let event = rx.recv().await.unwrap();
+    assert!(matches!(event, BrokerEvent::Disconnect { addr: a } if a == addr));
 }
 
 #[tokio::test]
@@ -265,6 +268,35 @@ async fn ws_half_writer_integration_notification() {
                 let parsed: serde_json::Value = serde_json::from_str(&text).unwrap();
                 assert_eq!(parsed["type"], "notification");
                 assert_eq!(parsed["value"], "Message sent");
+            }
+            other => panic!("expected Text message, got {other:?}"),
+        }
+    };
+
+    tokio::join!(writer, sender, recv);
+}
+
+#[tokio::test]
+async fn ws_half_writer_integration_user_left_notification() {
+    let (sink, mut receiver) = futures_mpsc::unbounded::<Message>();
+    let (tx, rx) = mpsc::unbounded_channel::<BrokerToClientMsg>();
+
+    let writer = ws_half_writer(sink, rx);
+    let sender = async {
+        tx.send(BrokerToClientMsg::Notification(
+            "alice has left the room".to_string(),
+        ))
+        .unwrap();
+        drop(tx);
+    };
+    // Receiving notification that Alice has left the room.
+    let recv = async {
+        let msg = receiver.next().await.unwrap();
+        match msg {
+            Message::Text(text) => {
+                let parsed: serde_json::Value = serde_json::from_str(&text).unwrap();
+                assert_eq!(parsed["type"], "notification");
+                assert_eq!(parsed["value"], "alice has left the room");
             }
             other => panic!("expected Text message, got {other:?}"),
         }

@@ -71,6 +71,10 @@ async fn ws_half_reader<T>(
             }
         }
     }
+
+    // Stream ended abruptly (connection dropped without close frame).
+    info!("WebSocket stream ended abruptly for {client_addr}, disconnecting");
+    let _ = to_broker.send(BrokerEvent::Disconnect { addr: client_addr });
 }
 
 async fn ws_half_writer<S>(mut sink: S, mut broker_rx: UnboundedReceiver<BrokerToClientMsg>)
