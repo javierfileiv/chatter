@@ -245,3 +245,83 @@ async def test_messages_do_not_cross_rooms(chatter_server):
     # Cleanup
     for ws in room_a + room_b:
         await ws.close()
+
+
+@pytest.mark.asyncio
+async def test_disconnect_notification_multiple_clients(chatter_server):
+    """When one client logs out, all other clients in the room are notified."""
+    clients = []
+    for i in range(4):
+        ws = await websockets.connect(f"ws://127.0.0.1:{chatter_server}")
+        clients.append(ws)
+
+    # All authenticate in the same room
+    for i, ws in enumerate(clients):
+        await ws.send(
+            json.dumps(
+                {
+                    "type": "authenticate",
+                    "username": f"user{i}",
+                    "password": "x",
+                    "room_name": "multi_notify",
+                }
+            )
+        )
+
+    # Consume auth responses
+    for ws in clients:
+        await asyncio.wait_for(ws.recv(), timeout=5)
+
+    # user0 logs out
+    await clients[0].send(json.dumps({"type": "logout", "message": "bye"}))
+
+    # users 1-3 should all receive a notification
+    for ws in clients[1:]:
+        msg = json.loads(await asyncio.wait_for(ws.recv(), timeout=5))
+        assert msg["type"] == "notification"
+        assert "user0" in msg["value"]
+        assert "left" in msg["value"].lower()
+
+    # Cleanup
+    for ws in clients[1:]:
+        await ws.close()
+
+
+@pytest.mark.asyncio
+async def test_disconnect_notification_on_close_without_logout(chatter_server):
+    """When a client closes the connection without sending logout, others are notified."""
+    clients = []
+    for i in range(3):
+        ws = await websockets.connect(f"ws://127.0.0.1:{chatter_server}")
+        clients.append(ws)
+
+    # All authenticate in the same room
+    for i, ws in enumerate(clients):
+        await ws.send(
+            json.dumps(
+                {
+                    "type": "authenticate",
+                    "username": f"user{i}",
+                    "password": "x",
+                    "room_name": "close_no_logout",
+                }
+            )
+        )
+
+    # Consume auth responses
+    for ws in clients:
+        await asyncio.wait_for(ws.recv(), timeout=5)
+
+    # user0 closes the connection without sending logout
+    await clients[0].close()
+
+    # users 1-2 should receive a notification
+    for ws in clients[1:]:
+        msg = json.loads(await asyncio.wait_for(ws.recv(), timeout=5))
+        assert msg["type"] == "notification"
+        assert "user0" in msg["value"]
+        assert "left" in msg["value"].lower()
+
+    # Cleanup
+    for ws in clients[1:]:
+        await ws.close()

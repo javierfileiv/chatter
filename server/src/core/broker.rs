@@ -47,6 +47,17 @@ impl BrokerClient {
             );
         }
     }
+    pub fn send_notification(&self, text: &str) {
+        if let Err(e) = self
+            .broker_to_client
+            .send(BrokerToClientMsg::Notification(text.to_owned()))
+        {
+            error!(
+                "Failed to send notification to client: {} (addr {}): {}",
+                self.str_id, self.addr, e
+            );
+        }
+    }
 }
 /// Internal broker events used by clients
 #[allow(dead_code)]
@@ -395,6 +406,43 @@ pub async fn run(mut rx_events: mpsc::UnboundedReceiver<BrokerEvent>) {
             }
             BrokerEvent::Disconnect { addr } => {
                 info!("Broker: Disconnect {addr} received");
+
+                // Get client info before removing.
+                let disconnecting_client = match ctx.clients.remove(&addr) {
+                    Some(client) => {
+                        info!(
+                            "Removed client {} (addr {}) from broker",
+                            client.str_id, addr
+                        );
+                        client
+                    }
+                    None => {
+                        warn!("Disconnect: client at {addr} not found in broker");
+                        return;
+                    }
+                };
+
+                let username = disconnecting_client.str_id;
+                let room_name = disconnecting_client.room_name.clone();
+
+                // Remove client from their room's address list.
+                if let Some(addr_list) = ctx.rooms.get_mut(&room_name) {
+                    addr_list.retain(|a| *a != addr);
+
+                    // Notify remaining clients in the room.
+                    let notification = format!("{} has left the room", username);
+                    for &room_addr in addr_list.iter() {
+                        if let Some(room_client) = ctx.clients.get(&room_addr) {
+                            room_client.send_notification(&notification);
+                        }
+                    }
+
+                    // Remove empty rooms just in case!
+                    if addr_list.is_empty() {
+                        ctx.rooms.remove(&room_name);
+                        info!("Room '{}' is now empty, removing it", room_name);
+                    }
+                }
             }
         }
     }

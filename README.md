@@ -9,6 +9,8 @@ A real-time chat application built with Rust, using WebSocket for client-server 
 - WebSocket-based real-time messaging
 - Multi-room support via a central message broker
 - User authentication (stub — always accepts)
+- Disconnect notifications — remaining room members are notified when a client leaves
+- Graceful and abrupt disconnect handling with automatic cleanup
 - Async I/O with Tokio
 
 ## Project Structure
@@ -34,6 +36,9 @@ chatter/
 │   ├── src/core/connection/    #   Connection module extras
 │   │   └── connection_tests.rs #   Unit tests for parse functions, ws_half_reader, and ws_half_writer
 │   └── Cargo.toml              #   edition = "2021"
+├── tests/                      # Python integration tests
+│   ├── conftest.py             #   Pytest fixtures
+│   └── test_integration.py     #   End-to-end WebSocket tests
 ├── Cargo.toml                  # Workspace manifest (3 members)
 ├── Cargo.lock
 ├── .pre-commit-config.yaml     # fmt + clippy hooks
@@ -125,11 +130,22 @@ cargo test -p server      # Server crate only (includes broker + connection test
 cargo test -p common      # Common crate only
 ```
 
+### Integration Tests
+
+Run the integration test script which builds the server, starts it on a free port, runs pytest, and cleans up:
+
+```bash
+./scripts/test_integration.sh
+```
+
+Requires: `pip install websockets pytest pytest-asyncio`
+
+Tests cover: authentication, message broadcasting, room isolation, logout, and disconnect notifications.
+
 ### Known Gaps
 
 - **Connection handler** — hardcodes username/password/room instead of deserializing the first WebSocket frame via `common::ws_messages`.
 - **Auth** — `server/src/auth/client.rs` always returns `true`.
-- **Disconnect** — broker logs disconnect events but does not clean up clients/rooms yet.
 - **Client** — `client/src/main.rs` is a stub; the previous TCP-based implementation is commented out.
 - **CI** — The pre-commit hooks provide local enforcement, but no CI workflow file exists (`.github/workflows/` is empty).
 - **`server/src/core/DONT_COMMITbroker_test.rs`** — stale duplicate of broker logic; keep as-is, do not modify.
