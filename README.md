@@ -40,6 +40,13 @@ chatter/
 ├── tests/                      # Python integration tests
 │   ├── conftest.py             #   Pytest fixtures
 │   └── test_integration.py     #   End-to-end WebSocket tests
+├── scripts/                    # Helper scripts
+│   ├── test_integration.sh     #   Builds server, runs pytest, cleans up
+│   └── gen_coverage.sh         #   Generates coverage report (text + HTML)
+├── .github/workflows/          # CI workflows
+│   ├── rust-ci.yml             #   Build, test, fmt, clippy
+│   ├── coverage.yml            #   Coverage report + GitHub Pages deploy
+│   └── integration.yml         #   Python integration tests
 ├── Cargo.toml                  # Workspace manifest (3 members)
 ├── Cargo.lock
 ├── .pre-commit-config.yaml     # fmt + clippy hooks
@@ -143,13 +150,19 @@ Requires: `pip install websockets pytest pytest-asyncio`
 
 Tests cover: authentication, message broadcasting, room isolation, logout, and disconnect notifications.
 
+### CI Workflows
+
+Three GitHub Actions workflows run on push/PR to main/master:
+
+- **rust-ci.yml** — builds, runs unit tests, checks formatting and clippy
+- **coverage.yml** — generates coverage report, deploys HTML to GitHub Pages
+- **integration.yml** — runs Python integration tests via `./scripts/test_integration.sh`
+
 ### Known Gaps
 
 - **Connection handler** — hardcodes username/password/room instead of deserializing the first WebSocket frame via `common::ws_messages`.
 - **Auth** — `server/src/auth/client.rs` always returns `true`.
 - **Client** — `client/src/main.rs` is a stub; the previous TCP-based implementation is commented out.
-- **CI** — The pre-commit hooks provide local enforcement, but no CI workflow file exists (`.github/workflows/` is empty).
-- **`server/src/core/DONT_COMMITbroker_test.rs`** — stale duplicate of broker logic; keep as-is, do not modify.
 
 ## License
 
