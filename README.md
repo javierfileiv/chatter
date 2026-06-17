@@ -27,7 +27,7 @@ chatter/
 │   ├── src/errors.rs           #   Unused error enum
 │   └── Cargo.toml              #   edition = "2021"
 ├── server/                     # Server crate
-│   ├── src/main.rs             #   Tokio entrypoint, binds 127.0.0.1:8080
+│   ├── src/main.rs             #   Tokio entrypoint, binds 127.0.0.1:8080, CLI args (port, log-dir)
 │   ├── src/auth.rs             #   Auth module root
 │   ├── src/auth/client.rs      #   authenticate() stub — always returns true
 │   ├── src/core.rs             #   Core module root
@@ -93,15 +93,14 @@ cargo build --workspace
 ### Run the Server
 
 ```bash
-# Default: 127.0.0.1:8080
+# Default: 127.0.0.1:8080, logs in ./logs/
 cargo run --bin server
 
-# Custom port
-cargo run --bin server -- --port 3000
-cargo run --bin server -- -p 9090
+# Custom port and log directory
+cargo run --bin server -- --port 3000 --log-dir /tmp/my-logs
 ```
 
-Logs are written to `logs/server.log` (gitignored) and echoed to stderr for warnings.
+Logs are written to the specified directory (default: `logs/`) and echoed to stderr for warnings.
 
 ### Run the Client
 
