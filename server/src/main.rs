@@ -10,6 +10,8 @@ use tokio::net::TcpListener;
 struct Args {
     #[arg(short, long, default_value = "8080")]
     port: u16,
+    #[arg(short, long, default_value = "logs")]
+    log_dir: String,
 }
 
 #[tokio::main]
@@ -18,6 +20,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let addr = format!("127.0.0.1:{}", args.port);
     let listener = TcpListener::bind(&addr).await?;
 
-    server::run(listener).await?;
+    server::run(listener, &args.log_dir).await?;
     Ok(())
 }

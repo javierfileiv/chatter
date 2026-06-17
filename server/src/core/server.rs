@@ -8,7 +8,7 @@ use tokio::task::JoinSet;
 use tokio_tungstenite::accept_async;
 
 // Example taken from: https://websocket.org/guides/languages/rust/
-pub async fn run(listener: TcpListener) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn run(listener: TcpListener, log_dir: &str) -> Result<(), Box<dyn std::error::Error>> {
     let mut tasks = JoinSet::new();
 
     Logger::try_with_str("info")?
@@ -16,7 +16,7 @@ pub async fn run(listener: TcpListener) -> Result<(), Box<dyn std::error::Error>
         .format_for_stderr(flexi_logger::detailed_format)
         .log_to_file(
             FileSpec::default()
-                .directory("logs")
+                .directory(log_dir)
                 .basename("server")
                 .suppress_timestamp(),
         )
