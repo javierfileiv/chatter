@@ -11,6 +11,7 @@ A real-time chat application built with Rust, using WebSocket for client-server 
 - Multi-room support via a central message broker
 - User authentication (stub — always accepts)
 - Disconnect notifications — remaining room members are notified when a client leaves
+- Server-side timestamps on all chat messages and notifications
 - Graceful and abrupt disconnect handling with automatic cleanup
 - Async I/O with Tokio
 
