@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod broker_tests;
 
+use chrono::Local;
 use common::ws_messages::ServerMessage;
 use log::{error, info, warn};
 use std::collections::HashMap;
@@ -32,13 +33,18 @@ impl BrokerClient {
             );
         }
     }
-    pub fn send_message(&self, sender_client: &BrokerClient, msg: &str) {
+    pub fn send_message(&self, sender_client: &BrokerClient, msg: &str, timestamp: &str) {
+        info!(
+            "Broadcasting message from {} at {}",
+            sender_client.str_id, timestamp
+        );
         if let Err(e) = self
             .broker_to_client
             .send(BrokerToClientMsg::new_chat_message(
                 sender_client.addr,
                 sender_client.str_id.clone(),
                 msg.to_owned(),
+                timestamp.to_owned(),
             ))
         {
             error!(
@@ -47,11 +53,11 @@ impl BrokerClient {
             );
         }
     }
-    pub fn send_notification(&self, text: &str) {
-        if let Err(e) = self
-            .broker_to_client
-            .send(BrokerToClientMsg::Notification(text.to_owned()))
-        {
+    pub fn send_notification(&self, text: &str, timestamp: &str) {
+        if let Err(e) = self.broker_to_client.send(BrokerToClientMsg::Notification {
+            text: text.to_owned(),
+            timestamp: timestamp.to_owned(),
+        }) {
             error!(
                 "Failed to send notification to client: {} (addr {}): {}",
                 self.str_id, self.addr, e
@@ -64,11 +70,17 @@ impl BrokerClient {
 #[derive(Debug, Clone)]
 pub enum BrokerEvent {
     /// Event for when a client connects
-    Connect { client: BrokerClient },
+    Connect {
+        client: BrokerClient,
+        /// Timestamp when the message was received
+        timestamp: String,
+    },
     /// Event for when a client disconnects
     Disconnect {
         /// Address of the disconnected client
         addr: SocketAddr,
+        /// Timestamp when the message was received
+        timestamp: String,
     },
     /// Event for broadcasting a message to all clients
     Broadcast {
@@ -76,6 +88,8 @@ pub enum BrokerEvent {
         sender_addr: SocketAddr,
         /// Message to broadcast in String format
         str_message: String,
+        /// Timestamp when the message was received
+        timestamp: String,
     },
     /// Event for joining or createing a new room
     JoinRoom {
@@ -83,6 +97,8 @@ pub enum BrokerEvent {
         sender_addr: SocketAddr,
         /// Name of the room to join/create
         room_name: String,
+        /// Timestamp when the message was received
+        timestamp: String,
     },
 }
 
@@ -125,8 +141,13 @@ pub enum BrokerToClientMsg {
         sender_name: String,
         /// Tungstenite Message for WebSocket
         text: String,
+        /// Timestamp when the message was received
+        timestamp: String,
     },
-    Notification(String),
+    Notification {
+        text: String,
+        timestamp: String,
+    },
 }
 
 impl BrokerToClientMsg {
@@ -134,11 +155,17 @@ impl BrokerToClientMsg {
         Self::Response(rsp)
     }
 
-    pub fn new_chat_message(sender: SocketAddr, sender_name: String, text: String) -> Self {
+    pub fn new_chat_message(
+        sender: SocketAddr,
+        sender_name: String,
+        text: String,
+        timestamp: String,
+    ) -> Self {
         Self::ChatMessage {
             sender,
             sender_name,
             text,
+            timestamp,
         }
     }
 }
@@ -147,6 +174,7 @@ impl TryFrom<BrokerToClientMsg> for ServerMessage {
     type Error = String;
 
     fn try_from(msg: BrokerToClientMsg) -> Result<Self, String> {
+        let timestamp = Local::now().format("%d/%m/%Y %H:%M:%S").to_string();
         match msg {
             BrokerToClientMsg::Response(BrokerRsp::Connect { status }) => {
                 if status {
@@ -165,6 +193,7 @@ impl TryFrom<BrokerToClientMsg> for ServerMessage {
                 if status {
                     Ok(ServerMessage::Notification {
                         value: "Disconnected".to_string(),
+                        timestamp,
                     })
                 } else {
                     Ok(ServerMessage::Error {
@@ -176,6 +205,7 @@ impl TryFrom<BrokerToClientMsg> for ServerMessage {
                 if status {
                     Ok(ServerMessage::Notification {
                         value: "Message sent".to_string(),
+                        timestamp,
                     })
                 } else {
                     Ok(ServerMessage::Error {
@@ -188,6 +218,7 @@ impl TryFrom<BrokerToClientMsg> for ServerMessage {
                     let action = if created { "created" } else { "joined" };
                     Ok(ServerMessage::Notification {
                         value: format!("Room {}", action),
+                        timestamp,
                     })
                 } else {
                     Ok(ServerMessage::Error {
@@ -196,13 +227,20 @@ impl TryFrom<BrokerToClientMsg> for ServerMessage {
                 }
             }
             BrokerToClientMsg::ChatMessage {
-                sender_name, text, ..
+                sender_name,
+                text,
+                timestamp,
+                ..
             } => Ok(ServerMessage::Chat {
                 sender: sender_name,
                 message: text,
+                timestamp,
             }),
-            BrokerToClientMsg::Notification(text) => {
-                Ok(ServerMessage::Notification { value: text })
+            BrokerToClientMsg::Notification { text, timestamp } => {
+                Ok(ServerMessage::Notification {
+                    value: text,
+                    timestamp,
+                })
             }
         }
     }
@@ -217,15 +255,26 @@ impl TryFrom<ServerMessage> for BrokerToClientMsg {
                 let status = success && error.is_none();
                 Ok(BrokerToClientMsg::Response(BrokerRsp::Connect { status }))
             }
-            ServerMessage::Chat { sender, message } => Ok(BrokerToClientMsg::ChatMessage {
+            ServerMessage::Chat {
+                sender,
+                message,
+                timestamp,
+            } => Ok(BrokerToClientMsg::ChatMessage {
                 sender: SocketAddr::from(([0, 0, 0, 0], 0)),
                 sender_name: sender,
                 text: message,
+                timestamp,
             }),
-            ServerMessage::Notification { value } => Ok(BrokerToClientMsg::Notification(value)),
-            ServerMessage::Error { value } => {
-                Ok(BrokerToClientMsg::Notification(format!("Error: {}", value)))
+            ServerMessage::Notification { value, timestamp } => {
+                Ok(BrokerToClientMsg::Notification {
+                    text: value,
+                    timestamp,
+                })
             }
+            ServerMessage::Error { value } => Ok(BrokerToClientMsg::Notification {
+                text: format!("Error: {}", value),
+                timestamp: String::new(),
+            }),
         }
     }
 }
@@ -358,8 +407,11 @@ pub async fn run(mut rx_events: mpsc::UnboundedReceiver<BrokerEvent>) {
 
     while let Some(event) = rx_events.recv().await {
         match event {
-            BrokerEvent::Connect { client } => {
-                info!("Broker: Connected: {} {}", client.str_id, client.addr);
+            BrokerEvent::Connect { client, timestamp } => {
+                info!(
+                    "Broker: Registering client {} ({}) at {}",
+                    client.str_id, client.addr, timestamp
+                );
 
                 let rsp_channel = client.broker_to_client.clone();
                 let status = register_client(&mut ctx, client);
@@ -374,13 +426,18 @@ pub async fn run(mut rx_events: mpsc::UnboundedReceiver<BrokerEvent>) {
             BrokerEvent::Broadcast {
                 sender_addr,
                 str_message,
+                timestamp,
             } => {
                 if let Some(sender_client) = ctx.clients.get(&sender_addr) {
                     if let Some(addr_list) = ctx.rooms.get(&sender_client.room_name) {
                         for &addr in addr_list.iter() {
                             if addr != sender_client.addr {
                                 let broadcast_client = ctx.clients.get(&addr).unwrap();
-                                broadcast_client.send_message(sender_client, &str_message);
+                                broadcast_client.send_message(
+                                    sender_client,
+                                    &str_message,
+                                    &timestamp,
+                                );
                             }
                         }
                         sender_client.send_response(BrokerRsp::Broadcast { status: true });
@@ -395,7 +452,12 @@ pub async fn run(mut rx_events: mpsc::UnboundedReceiver<BrokerEvent>) {
             BrokerEvent::JoinRoom {
                 sender_addr,
                 room_name,
+                timestamp,
             } => {
+                info!(
+                    "Broker: JoinRoom: {} {} at {}",
+                    sender_addr, room_name, timestamp
+                );
                 let (status, created) =
                     join_room(&mut ctx, JoinRoomType::RoomMove(sender_addr), room_name);
                 if let Some(client) = ctx.clients.get(&sender_addr) {
@@ -404,8 +466,8 @@ pub async fn run(mut rx_events: mpsc::UnboundedReceiver<BrokerEvent>) {
                     warn!("JoinRoom: no client at {sender_addr}, dropping response");
                 }
             }
-            BrokerEvent::Disconnect { addr } => {
-                info!("Broker: Disconnect {addr} received");
+            BrokerEvent::Disconnect { addr, timestamp } => {
+                info!("Broker: Disconnect {addr} received at {timestamp}");
 
                 // Get client info before removing.
                 let disconnecting_client = match ctx.clients.remove(&addr) {
@@ -433,7 +495,7 @@ pub async fn run(mut rx_events: mpsc::UnboundedReceiver<BrokerEvent>) {
                     let notification = format!("{} has left the room", username);
                     for &room_addr in addr_list.iter() {
                         if let Some(room_client) = ctx.clients.get(&room_addr) {
-                            room_client.send_notification(&notification);
+                            room_client.send_notification(&notification, &timestamp);
                         }
                     }
 

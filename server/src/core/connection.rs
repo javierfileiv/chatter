@@ -3,6 +3,7 @@ mod connection_tests;
 
 use crate::auth::client;
 use crate::core::broker::{BrokerClient, BrokerEvent, BrokerToClientMsg};
+use chrono::Local;
 use common::ws_messages::{AuthenticateUser, ClientMessage, ServerMessage};
 use futures_util::{Sink, SinkExt, Stream, StreamExt};
 use log::{error, info, warn};
@@ -24,12 +25,26 @@ fn parse_authenticate(raw: &str) -> Result<AuthenticateUser, ServerMessage> {
 
 // Parse client raw JSON and convert it to a broker broadcast request.
 fn parse_broadcast_message(raw: &str, client_addr: SocketAddr) -> Option<BrokerEvent> {
+    let timestamp = Local::now().format("%d/%m/%Y %H:%M:%S").to_string();
     match serde_json::from_str::<ClientMessage>(raw) {
-        Ok(ClientMessage::Broadcast(send_msg)) => Some(BrokerEvent::Broadcast {
-            sender_addr: client_addr,
-            str_message: send_msg.message,
-        }),
-        Ok(ClientMessage::Logout(_)) => Some(BrokerEvent::Disconnect { addr: client_addr }),
+        Ok(ClientMessage::Broadcast(send_msg)) => {
+            info!(
+                "Received broadcast from {} at {}",
+                send_msg.username, timestamp
+            );
+            Some(BrokerEvent::Broadcast {
+                sender_addr: client_addr,
+                str_message: send_msg.message,
+                timestamp,
+            })
+        }
+        Ok(ClientMessage::Logout(_)) => {
+            info!("Received logout at {}", timestamp);
+            Some(BrokerEvent::Disconnect {
+                addr: client_addr,
+                timestamp,
+            })
+        }
         Ok(ClientMessage::Authenticate(_)) => {
             warn!("Unexpected authenticate message in reader loop");
             None
@@ -49,6 +64,7 @@ async fn ws_half_reader<T>(
     T: Stream<Item = Result<Message, Error>> + Unpin,
 {
     while let Some(ws_msg) = stream.next().await {
+        let timestamp = Local::now().format("%d/%m/%Y %H:%M:%S").to_string();
         match ws_msg {
             Ok(Message::Text(json_str)) => {
                 if let Some(event) = parse_broadcast_message(&json_str, client_addr) {
@@ -61,20 +77,30 @@ async fn ws_half_reader<T>(
             }
             Ok(Message::Close(_)) | Ok(_) => {
                 info!("Client closed WebSocket, disconnect client");
-                let _ = to_broker.send(BrokerEvent::Disconnect { addr: client_addr });
+                let _ = to_broker.send(BrokerEvent::Disconnect {
+                    addr: client_addr,
+                    timestamp,
+                });
                 return;
             }
             Err(e) => {
                 error!("WebSocket read error: {}, disconnect client", e);
-                let _ = to_broker.send(BrokerEvent::Disconnect { addr: client_addr });
+                let _ = to_broker.send(BrokerEvent::Disconnect {
+                    addr: client_addr,
+                    timestamp,
+                });
                 return;
             }
         }
     }
 
     // Stream ended abruptly (connection dropped without close frame).
+    let timestamp = Local::now().format("%d/%m/%Y %H:%M:%S").to_string();
     info!("WebSocket stream ended abruptly for {client_addr}, disconnecting");
-    let _ = to_broker.send(BrokerEvent::Disconnect { addr: client_addr });
+    let _ = to_broker.send(BrokerEvent::Disconnect {
+        addr: client_addr,
+        timestamp,
+    });
 }
 
 async fn ws_half_writer<S>(mut sink: S, mut broker_rx: UnboundedReceiver<BrokerToClientMsg>)
@@ -150,8 +176,12 @@ where
         broker_to_client: broker_tx,
     };
 
+    let timestamp = Local::now().format("%d/%m/%Y %H:%M:%S").to_string();
+    info!("Sending connect for {} at {}", auth_msg.username, timestamp);
+
     let msg_to_broker = BrokerEvent::Connect {
         client: broker_client,
+        timestamp,
     };
 
     if broker_sender.send(msg_to_broker).is_err() {

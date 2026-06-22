@@ -17,6 +17,10 @@ fn fake_client(
         rx,
     )
 }
+
+fn test_timestamp() -> String {
+    "17/06/2026 18:30:00".to_string()
+}
 async fn check_response(rx_from_client: &mut UnboundedReceiver<BrokerToClientMsg>) {
     let response_from_broker =
         tokio::time::timeout(std::time::Duration::from_millis(100), rx_from_client.recv()).await;
@@ -46,14 +50,15 @@ async fn check_response(rx_from_client: &mut UnboundedReceiver<BrokerToClientMsg
             sender,
             sender_name,
             text,
+            timestamp,
         })) => {
             println!(
-                "Received message from {} (addr:{}): {}",
-                sender_name, sender, text
+                "Received message from {} (addr:{}) at {}: {}",
+                sender_name, sender, timestamp, text
             );
         }
-        Ok(Some(BrokerToClientMsg::Notification(text))) => {
-            println!("Received notification: {}", text);
+        Ok(Some(BrokerToClientMsg::Notification { text, timestamp })) => {
+            println!("Received notification at {}: {}", timestamp, text);
         }
         Ok(None) => {
             panic!("Closed mpsc.");
@@ -69,7 +74,10 @@ async fn test_broker_connection_success() {
     let tx_broker = init();
     let addr: SocketAddr = "127.0.0.1:8080".parse().unwrap();
     let (client, mut rx) = fake_client(addr, "Alice", "games");
-    let result = tx_broker.send(BrokerEvent::Connect { client });
+    let result = tx_broker.send(BrokerEvent::Connect {
+        client,
+        timestamp: test_timestamp(),
+    });
 
     assert!(
         result.is_ok(),
@@ -84,12 +92,18 @@ async fn test_broker_broadcast_success() {
     let addr: SocketAddr = "127.0.0.1:8080".parse().unwrap();
     let (client, mut rx) = fake_client(addr, "Alice", "games");
 
-    tx_broker.send(BrokerEvent::Connect { client }).unwrap();
+    tx_broker
+        .send(BrokerEvent::Connect {
+            client,
+            timestamp: test_timestamp(),
+        })
+        .unwrap();
     check_response(&mut rx).await;
 
     let result = tx_broker.send(BrokerEvent::Broadcast {
         sender_addr: addr,
         str_message: "Hello World".into(),
+        timestamp: test_timestamp(),
     });
 
     assert!(
@@ -109,12 +123,18 @@ async fn broadcast_to_multiple_clients_in_same_room() {
     let (bob, mut rx_bob) = fake_client(addr_bob, "Bob", "games");
 
     tx_broker
-        .send(BrokerEvent::Connect { client: alice })
+        .send(BrokerEvent::Connect {
+            client: alice,
+            timestamp: test_timestamp(),
+        })
         .unwrap();
     check_response(&mut rx_alice).await;
 
     tx_broker
-        .send(BrokerEvent::Connect { client: bob })
+        .send(BrokerEvent::Connect {
+            client: bob,
+            timestamp: test_timestamp(),
+        })
         .unwrap();
     check_response(&mut rx_bob).await;
 
@@ -122,6 +142,7 @@ async fn broadcast_to_multiple_clients_in_same_room() {
         .send(BrokerEvent::Broadcast {
             sender_addr: addr_alice,
             str_message: "Hi everyone!".into(),
+            timestamp: test_timestamp(),
         })
         .unwrap();
 
@@ -153,13 +174,19 @@ async fn broadcast_only_sender_in_room() {
     let addr: SocketAddr = "127.0.0.1:6003".parse().unwrap();
     let (client, mut rx) = fake_client(addr, "Solo", "empty");
 
-    tx_broker.send(BrokerEvent::Connect { client }).unwrap();
+    tx_broker
+        .send(BrokerEvent::Connect {
+            client,
+            timestamp: test_timestamp(),
+        })
+        .unwrap();
     check_response(&mut rx).await;
 
     tx_broker
         .send(BrokerEvent::Broadcast {
             sender_addr: addr,
             str_message: "Nobody here".into(),
+            timestamp: test_timestamp(),
         })
         .unwrap();
 
@@ -193,12 +220,18 @@ async fn broadcast_does_not_cross_rooms() {
     let (bob, mut rx_bob) = fake_client(addr_bob, "Bob", "room_b");
 
     tx_broker
-        .send(BrokerEvent::Connect { client: alice })
+        .send(BrokerEvent::Connect {
+            client: alice,
+            timestamp: test_timestamp(),
+        })
         .unwrap();
     check_response(&mut rx_alice).await;
 
     tx_broker
-        .send(BrokerEvent::Connect { client: bob })
+        .send(BrokerEvent::Connect {
+            client: bob,
+            timestamp: test_timestamp(),
+        })
         .unwrap();
     check_response(&mut rx_bob).await;
 
@@ -206,6 +239,7 @@ async fn broadcast_does_not_cross_rooms() {
         .send(BrokerEvent::Broadcast {
             sender_addr: addr_alice,
             str_message: "Wrong room!".into(),
+            timestamp: test_timestamp(),
         })
         .unwrap();
 
@@ -232,13 +266,19 @@ async fn join_room_first_connect_creates_room_success() {
     let addr: SocketAddr = "127.0.0.1:5000".parse().unwrap();
     let (client, mut rx) = fake_client(addr, "Alice", "games");
 
-    tx_broker.send(BrokerEvent::Connect { client }).unwrap();
+    tx_broker
+        .send(BrokerEvent::Connect {
+            client,
+            timestamp: test_timestamp(),
+        })
+        .unwrap();
     check_response(&mut rx).await;
 
     tx_broker
         .send(BrokerEvent::JoinRoom {
             sender_addr: addr,
             room_name: "lounge".into(),
+            timestamp: test_timestamp(),
         })
         .unwrap();
     check_response(&mut rx).await;
@@ -252,12 +292,18 @@ async fn join_room_first_connect_duplicate_client_fails() {
     let (client2, mut rx2) = fake_client(addr, "Alice", "other");
 
     tx_broker
-        .send(BrokerEvent::Connect { client: client1 })
+        .send(BrokerEvent::Connect {
+            client: client1,
+            timestamp: test_timestamp(),
+        })
         .unwrap();
     check_response(&mut rx1).await;
 
     tx_broker
-        .send(BrokerEvent::Connect { client: client2 })
+        .send(BrokerEvent::Connect {
+            client: client2,
+            timestamp: test_timestamp(),
+        })
         .unwrap();
 
     let resp = tokio::time::timeout(std::time::Duration::from_millis(100), rx2.recv()).await;
@@ -276,13 +322,19 @@ async fn join_room_room_move_to_new_room_success() {
     let addr: SocketAddr = "127.0.0.1:5002".parse().unwrap();
     let (client, mut rx) = fake_client(addr, "Alice", "games");
 
-    tx_broker.send(BrokerEvent::Connect { client }).unwrap();
+    tx_broker
+        .send(BrokerEvent::Connect {
+            client,
+            timestamp: test_timestamp(),
+        })
+        .unwrap();
     check_response(&mut rx).await;
 
     tx_broker
         .send(BrokerEvent::JoinRoom {
             sender_addr: addr,
             room_name: "lounge".into(),
+            timestamp: test_timestamp(),
         })
         .unwrap();
     check_response(&mut rx).await;
@@ -298,12 +350,18 @@ async fn join_room_room_move_to_existing_room_success() {
     let (client_b, mut rx_b) = fake_client(addr_b, "Bob", "lounge");
 
     tx_broker
-        .send(BrokerEvent::Connect { client: client_a })
+        .send(BrokerEvent::Connect {
+            client: client_a,
+            timestamp: test_timestamp(),
+        })
         .unwrap();
     check_response(&mut rx_a).await;
 
     tx_broker
-        .send(BrokerEvent::Connect { client: client_b })
+        .send(BrokerEvent::Connect {
+            client: client_b,
+            timestamp: test_timestamp(),
+        })
         .unwrap();
     check_response(&mut rx_b).await;
 
@@ -311,6 +369,7 @@ async fn join_room_room_move_to_existing_room_success() {
         .send(BrokerEvent::JoinRoom {
             sender_addr: addr_b,
             room_name: "games".into(),
+            timestamp: test_timestamp(),
         })
         .unwrap();
     check_response(&mut rx_b).await;
@@ -322,7 +381,12 @@ async fn join_room_room_move_unknown_addr_fails() {
     let addr: SocketAddr = "127.0.0.1:5005".parse().unwrap();
     let (client, mut rx) = fake_client(addr, "Alice", "games");
 
-    tx_broker.send(BrokerEvent::Connect { client }).unwrap();
+    tx_broker
+        .send(BrokerEvent::Connect {
+            client,
+            timestamp: test_timestamp(),
+        })
+        .unwrap();
     check_response(&mut rx).await;
 
     let unknown: SocketAddr = "127.0.0.1:9999".parse().unwrap();
@@ -330,6 +394,7 @@ async fn join_room_room_move_unknown_addr_fails() {
         .send(BrokerEvent::JoinRoom {
             sender_addr: unknown,
             room_name: "games".into(),
+            timestamp: test_timestamp(),
         })
         .unwrap();
 
@@ -344,13 +409,19 @@ async fn join_room_room_move_same_room_fails() {
     let addr: SocketAddr = "127.0.0.1:5006".parse().unwrap();
     let (client, mut rx) = fake_client(addr, "Alice", "games");
 
-    tx_broker.send(BrokerEvent::Connect { client }).unwrap();
+    tx_broker
+        .send(BrokerEvent::Connect {
+            client,
+            timestamp: test_timestamp(),
+        })
+        .unwrap();
     check_response(&mut rx).await;
 
     tx_broker
         .send(BrokerEvent::JoinRoom {
             sender_addr: addr,
             room_name: "games".into(),
+            timestamp: test_timestamp(),
         })
         .unwrap();
 
@@ -381,7 +452,7 @@ mod tryfrom_tests {
             result,
             ServerMessage::AuthResult {
                 success: true,
-                error: None
+                error: None,
             }
         ));
     }
@@ -402,7 +473,7 @@ mod tryfrom_tests {
         let result = ServerMessage::try_from(msg).unwrap();
         assert!(matches!(
             result,
-            ServerMessage::Notification { ref value } if value == "Disconnected"
+            ServerMessage::Notification { ref value, .. } if value == "Disconnected"
         ));
     }
 
@@ -422,7 +493,7 @@ mod tryfrom_tests {
         let result = ServerMessage::try_from(msg).unwrap();
         assert!(matches!(
             result,
-            ServerMessage::Notification { ref value } if value == "Message sent"
+            ServerMessage::Notification { ref value, .. } if value == "Message sent"
         ));
     }
 
@@ -445,7 +516,7 @@ mod tryfrom_tests {
         let result = ServerMessage::try_from(msg).unwrap();
         assert!(matches!(
             result,
-            ServerMessage::Notification { ref value } if value == "Room created"
+            ServerMessage::Notification { ref value, .. } if value == "Room created"
         ));
     }
 
@@ -458,7 +529,7 @@ mod tryfrom_tests {
         let result = ServerMessage::try_from(msg).unwrap();
         assert!(matches!(
             result,
-            ServerMessage::Notification { ref value } if value == "Room joined"
+            ServerMessage::Notification { ref value, .. } if value == "Room joined"
         ));
     }
 
@@ -481,21 +552,27 @@ mod tryfrom_tests {
             sender: "127.0.0.1:8080".parse().unwrap(),
             sender_name: "alice".to_string(),
             text: "hello".to_string(),
+            timestamp: "17/06/2026 18:30:00".to_string(),
         };
         let result = ServerMessage::try_from(msg).unwrap();
         assert!(matches!(
             result,
-            ServerMessage::Chat { ref sender, ref message } if sender == "alice" && message == "hello"
+            ServerMessage::Chat { ref sender, ref message, ref timestamp }
+            if sender == "alice" && message == "hello" && timestamp == "17/06/2026 18:30:00"
         ));
     }
 
     #[test]
     fn tryfrom_broker_notification() {
-        let msg = BrokerToClientMsg::Notification("user left".to_string());
+        let msg = BrokerToClientMsg::Notification {
+            text: "user left".to_string(),
+            timestamp: "17/06/2026 18:30:00".to_string(),
+        };
         let result = ServerMessage::try_from(msg).unwrap();
         assert!(matches!(
             result,
-            ServerMessage::Notification { ref value } if value == "user left"
+            ServerMessage::Notification { ref value, ref timestamp }
+            if value == "user left" && timestamp == "17/06/2026 18:30:00"
         ));
     }
 
@@ -519,11 +596,12 @@ mod tryfrom_tests {
         let msg = ServerMessage::Chat {
             sender: "alice".to_string(),
             message: "hello".to_string(),
+            timestamp: "17/06/2026 18:30:00".to_string(),
         };
         let result = BrokerToClientMsg::try_from(msg).unwrap();
         assert!(
-            matches!(result, BrokerToClientMsg::ChatMessage { ref sender_name, ref text, .. }
-            if sender_name == "alice" && text == "hello")
+            matches!(result, BrokerToClientMsg::ChatMessage { ref sender_name, ref text, ref timestamp, .. }
+            if sender_name == "alice" && text == "hello" && timestamp == "17/06/2026 18:30:00")
         );
     }
 
@@ -531,9 +609,12 @@ mod tryfrom_tests {
     fn tryfrom_server_to_broker_notification() {
         let msg = ServerMessage::Notification {
             value: "hello".to_string(),
+            timestamp: "17/06/2026 18:30:00".to_string(),
         };
         let result = BrokerToClientMsg::try_from(msg).unwrap();
-        assert!(matches!(result, BrokerToClientMsg::Notification(ref text) if text == "hello"));
+        assert!(
+            matches!(result, BrokerToClientMsg::Notification { ref text, ref timestamp } if text == "hello" && timestamp == "17/06/2026 18:30:00")
+        );
     }
 
     #[test]
@@ -543,7 +624,7 @@ mod tryfrom_tests {
         };
         let result = BrokerToClientMsg::try_from(msg).unwrap();
         assert!(
-            matches!(result, BrokerToClientMsg::Notification(ref text) if text == "Error: oops")
+            matches!(result, BrokerToClientMsg::Notification { ref text, .. } if text == "Error: oops")
         );
     }
 }

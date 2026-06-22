@@ -46,6 +46,7 @@ fn parse_client_message_send_produces_broadcast() {
         BrokerEvent::Broadcast {
             sender_addr,
             str_message,
+            ..
         } => {
             assert_eq!(sender_addr, addr);
             assert_eq!(str_message, "hello");
@@ -61,7 +62,7 @@ fn parse_client_message_logout_produces_disconnect() {
     let event = parse_broadcast_message(json, addr);
     assert!(event.is_some());
     match event.unwrap() {
-        BrokerEvent::Disconnect { addr: a } => {
+        BrokerEvent::Disconnect { addr: a, .. } => {
             assert_eq!(a, addr);
         }
         other => panic!("expected Disconnect, got {other:?}"),
@@ -103,6 +104,7 @@ async fn ws_half_reader_sends_broadcast_event() {
         BrokerEvent::Broadcast {
             sender_addr,
             str_message,
+            ..
         } => {
             assert_eq!(sender_addr, addr);
             assert_eq!(str_message, "hello");
@@ -122,7 +124,7 @@ async fn ws_half_reader_sends_disconnect_on_logout() {
     ws_half_reader(stream, tx, addr).await;
 
     let event = rx.recv().await.unwrap();
-    assert!(matches!(event, BrokerEvent::Disconnect { addr: a } if a == addr));
+    assert!(matches!(event, BrokerEvent::Disconnect { addr: a, .. } if a == addr));
 }
 
 // Receives fake disconnect event and verify it ok.
@@ -138,7 +140,7 @@ async fn ws_half_reader_sends_disconnect_on_close() {
     ws_half_reader(stream, tx, addr).await;
 
     let event = rx.recv().await.unwrap();
-    assert!(matches!(event, BrokerEvent::Disconnect { addr: a } if a == addr));
+    assert!(matches!(event, BrokerEvent::Disconnect { addr: a, .. } if a == addr));
 }
 
 // Receives fake error socket event and verify it ok.
@@ -151,7 +153,7 @@ async fn ws_half_reader_sends_disconnect_on_error() {
     ws_half_reader(stream, tx, addr).await;
 
     let event = rx.recv().await.unwrap();
-    assert!(matches!(event, BrokerEvent::Disconnect { addr: a } if a == addr));
+    assert!(matches!(event, BrokerEvent::Disconnect { addr: a, .. } if a == addr));
 }
 
 // Receives fake authenticate type event when we are not waiting for it and verify it is ignored.
@@ -167,7 +169,7 @@ async fn ws_half_reader_ignores_unexpected_authenticate() {
 
     // The authenticate message is ignored, but stream ending triggers disconnect.
     let event = rx.recv().await.unwrap();
-    assert!(matches!(event, BrokerEvent::Disconnect { addr: a } if a == addr));
+    assert!(matches!(event, BrokerEvent::Disconnect { addr: a, .. } if a == addr));
 }
 
 #[tokio::test]
@@ -228,6 +230,7 @@ async fn ws_half_writer_integration_chat_message() {
             sender: sender_addr,
             sender_name: "alice".to_string(),
             text: "hello!".to_string(),
+            timestamp: "17/06/2026 18:30:00".to_string(),
         })
         .unwrap();
         drop(tx);
@@ -240,6 +243,7 @@ async fn ws_half_writer_integration_chat_message() {
                 assert_eq!(parsed["type"], "chat");
                 assert_eq!(parsed["sender"], "alice");
                 assert_eq!(parsed["message"], "hello!");
+                assert_eq!(parsed["timestamp"], "17/06/2026 18:30:00");
             }
             other => panic!("expected Text message, got {other:?}"),
         }
@@ -268,6 +272,7 @@ async fn ws_half_writer_integration_notification() {
                 let parsed: serde_json::Value = serde_json::from_str(&text).unwrap();
                 assert_eq!(parsed["type"], "notification");
                 assert_eq!(parsed["value"], "Message sent");
+                assert!(parsed["timestamp"].is_string());
             }
             other => panic!("expected Text message, got {other:?}"),
         }
@@ -283,9 +288,10 @@ async fn ws_half_writer_integration_user_left_notification() {
 
     let writer = ws_half_writer(sink, rx);
     let sender = async {
-        tx.send(BrokerToClientMsg::Notification(
-            "alice has left the room".to_string(),
-        ))
+        tx.send(BrokerToClientMsg::Notification {
+            text: "alice has left the room".to_string(),
+            timestamp: "17/06/2026 18:30:00".to_string(),
+        })
         .unwrap();
         drop(tx);
     };
@@ -297,6 +303,7 @@ async fn ws_half_writer_integration_user_left_notification() {
                 let parsed: serde_json::Value = serde_json::from_str(&text).unwrap();
                 assert_eq!(parsed["type"], "notification");
                 assert_eq!(parsed["value"], "alice has left the room");
+                assert_eq!(parsed["timestamp"], "17/06/2026 18:30:00");
             }
             other => panic!("expected Text message, got {other:?}"),
         }
