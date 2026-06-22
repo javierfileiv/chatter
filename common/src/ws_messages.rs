@@ -56,10 +56,14 @@ pub enum ServerMessage {
     },
     // Broadcast response
     #[serde(rename = "chat")]
-    Chat { sender: String, message: String },
+    Chat {
+        sender: String,
+        message: String,
+        timestamp: String,
+    },
     // Server communicates something
     #[serde(rename = "notification")]
-    Notification { value: String },
+    Notification { value: String, timestamp: String },
     // Some error sent in the server
     #[serde(rename = "error")]
     Error { value: String },
