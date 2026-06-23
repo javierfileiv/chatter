@@ -1,9 +1,12 @@
+use std::sync::Arc;
+
+use crate::Context;
 use cursive::{
     views::{EditView, TextView},
     Cursive,
 };
 
-pub fn handle_send(siv: &mut Cursive, msg: String) {
+pub fn handle_send(siv: &mut Cursive, ctx: &Arc<Context>, msg: String) {
     if msg.is_empty() {
         return;
     }
@@ -12,7 +15,7 @@ pub fn handle_send(siv: &mut Cursive, msg: String) {
         "/help" => {
             siv.call_on_name("messages", |view: &mut TextView| {
                 view.append(
-                    "\n=== Commands ===\n/help - Show this help\n/clear - Clear messages\n/connect - Connect to server\n/quit - Exit chat\n\n",
+                    "\n=== Commands ===\n/help - Show this help\n/clear - Clear messages\n/connect - Connect to server\n/quit - Exit chat\n\n"
                 );
             });
             siv.call_on_name("input", |view: &mut EditView| {
@@ -30,7 +33,7 @@ pub fn handle_send(siv: &mut Cursive, msg: String) {
             return;
         }
         "/connect" => {
-            // TODO: show connect dialog
+            crate::ui::dialogs::show_connect_dialog(siv, ctx);
             return;
         }
         "/quit" => {

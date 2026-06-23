@@ -5,6 +5,7 @@ use cursive::{
     views::{Dialog, DummyView, EditView, LinearLayout, Panel, ScrollView, TextView},
     View,
 };
+use std::sync::Arc;
 
 use crate::Context;
 
@@ -43,11 +44,12 @@ pub fn build_messages() -> Box<dyn View> {
     )
 }
 
-pub fn build_input() -> Box<dyn View> {
+pub fn build_input(ctx: &Arc<Context>) -> Box<dyn View> {
+    let ctx = ctx.clone();
     Box::new(
         Dialog::around(
             EditView::new()
-                .on_submit(|s, text| crate::commands::handle_send(s, text.to_string()))
+                .on_submit(move |s, text| crate::commands::handle_send(s, &ctx, text.to_string()))
                 .with_name("input")
                 .min_width(50)
                 .max_height(3)
