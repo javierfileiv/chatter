@@ -10,13 +10,9 @@ pub fn show_connect_dialog(siv: &mut Cursive, ctx: &Context) {
     let user_field = EditView::new()
         .content(&ctx.username)
         .with_name("connect_user");
-
     let pass_field = EditView::new().secret().with_name("connect_pass");
-
     let pass_form = LinearLayout::horizontal().child(pass_field);
-
     let room_field = EditView::new().with_name("connect_room");
-
     let form = LinearLayout::vertical()
         .child(TextView::new("Username:"))
         .child(user_field)
@@ -24,7 +20,6 @@ pub fn show_connect_dialog(siv: &mut Cursive, ctx: &Context) {
         .child(pass_form)
         .child(TextView::new("Room:"))
         .child(room_field);
-
     let dialog = Dialog::new()
         .title("Connect to server")
         .content(form)
