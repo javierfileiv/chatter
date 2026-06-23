@@ -17,7 +17,7 @@ pub fn make_ui(siv: &mut Cursive, ctx: &Arc<Context>) {
     siv.add_fullscreen_layer(layout);
     siv.add_global_callback(cursive::event::Key::Esc, |s| s.quit());
 
-    // Update clock on global header
+    // Update clock on global header each 1 second.
     siv.set_fps(1);
     siv.add_global_callback(cursive::event::Event::Refresh, {
         let username = ctx.get_user().to_string();
