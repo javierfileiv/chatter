@@ -4,12 +4,13 @@ use cursive::{views, Cursive};
 
 use crate::Context;
 
+pub mod dialogs;
 pub mod layout;
 
 pub fn make_ui(siv: &mut Cursive, ctx: &Arc<Context>) {
     let header = layout::build_header(ctx);
     let messages = layout::build_messages();
-    let input = layout::build_input();
+    let input = layout::build_input(ctx);
     let help_text = layout::build_help();
 
     let layout = layout::assemble_layout(header, messages, input, help_text);
