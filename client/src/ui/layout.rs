@@ -61,6 +61,20 @@ pub fn build_input(ctx: &Arc<Context>) -> Box<dyn View> {
     )
 }
 
+pub fn build_notification() -> Box<dyn View> {
+    Box::new(
+        Dialog::around(
+            TextView::new("Here notifications")
+                .h_align(HAlign::Right)
+                .with_name("notification")
+                .min_width(10)
+                .max_height(3)
+                .full_width(),
+        )
+        .full_width(),
+    )
+}
+
 pub fn build_help() -> Box<dyn View> {
     Box::new(
         Panel::new(
@@ -76,12 +90,14 @@ pub fn assemble_layout(
     messages: Box<dyn View>,
     input: Box<dyn View>,
     help_text: Box<dyn View>,
+    notification: Box<dyn View>,
 ) -> Box<dyn View> {
     let layout = LinearLayout::vertical()
         .child(header)
         .child(messages)
         .child(input)
-        .child(help_text);
+        .child(help_text)
+        .child(notification);
 
     Box::new(
         LinearLayout::horizontal()
