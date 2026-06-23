@@ -9,6 +9,9 @@ A real-time chat application built with Rust, using WebSocket for client-server 
 
 - WebSocket-based real-time messaging
 - Multi-room support via a central message broker
+- **Client TUI** built with [Cursive](https://github.com/gyscos/cursive) — retro terminal theme
+- Client commands: `/help`, `/clear`, `/connect`, `/quit`
+- Live clock in the header UI (updates every second)
 - User authentication (stub — always accepts)
 - Disconnect notifications — remaining room members are notified when a client leaves
 - Server-side timestamps on all chat messages and notifications
@@ -19,9 +22,15 @@ A real-time chat application built with Rust, using WebSocket for client-server 
 
 ```
 chatter/
-├── client/                     # CLI client crate (stub)
-│   ├── src/main.rs             #   Currently prints "Hello, world!"
-│   └── Cargo.toml              #   edition = "2021", depends on clap
+├── client/                     # Terminal client crate (Cursive TUI)
+│   ├── src/main.rs             #   Entrypoint, CLI args, Context struct
+│   ├── src/commands.rs         #   Slash commands: /help, /clear, /connect, /quit
+│   ├── src/theme.rs            #   Retro terminal color theme
+│   ├── src/ui.rs               #   TUI assembly, clock refresh callback
+│   ├── src/ui/
+│   │   ├── layout.rs           #   Layout: header, messages, input, help, notification
+│   │   └── dialogs.rs          #   Connect dialog (Enter to validate)
+│   └── Cargo.toml              #   edition = "2021", cursive, clap, chrono
 ├── common/                     # Shared library crate
 │   ├── src/lib.rs              #   Re-exports errors and ws_messages
 │   ├── src/ws_messages.rs      #   Serde structs: AuthenticateUser, SendMessage, Logout
@@ -76,7 +85,7 @@ client ──WebSocket──▶ server::core::server (accept loop)
 |-------|------|-----------------|
 | `common` | Shared message types & errors | `serde`, `serde_json`, `anyhow`, `tokio-util` |
 | `server` | WebSocket server + broker | `tokio` (full), `tokio-tungstenite`, `futures-util`, `flexi_logger`, `tracing` |
-| `client` | CLI client (stub) | `clap` |
+| `client` | Terminal TUI client | `cursive`, `clap`, `chrono`, `tokio` |
 
 ## Getting Started
 
@@ -106,10 +115,23 @@ Logs are written to the specified directory (default: `logs/`) and echoed to std
 ### Run the Client
 
 ```bash
+# Default: prompts for user, connects to 127.0.0.1:8080
 cargo run --bin client
+
+# With custom user and server
+cargo run --bin client -- --user alice --port 3000
 ```
 
-Currently a stub — prints "Hello, world!".
+Cursive TUI with a retro terminal theme. Commands available in the chat:
+
+| Command | Action |
+|---------|--------|
+| `/help` | Show available commands |
+| `/clear` | Clear the message area |
+| `/connect` | Open the server connection dialog |
+| `/quit` | Exit the application |
+
+**Note:** The TUI is functional but not yet connected to the WebSocket backend (WIP).
 
 ## Development
 
@@ -162,7 +184,7 @@ Three GitHub Actions workflows run on push/PR to main/master:
 
 - **Connection handler** — hardcodes username/password/room instead of deserializing the first WebSocket frame via `common::ws_messages`.
 - **Auth** — `server/src/auth/client.rs` always returns `true`.
-- **Client** — `client/src/main.rs` is a stub; the previous TCP-based implementation is commented out.
+- **Client** — TUI is implemented (commands, dialogs, layout) but WebSocket connection is still WIP.
 
 ## License
 
