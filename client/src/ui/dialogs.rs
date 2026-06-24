@@ -7,8 +7,9 @@ use cursive::{
 use crate::Context;
 
 pub fn show_connect_dialog(siv: &mut Cursive, ctx: &Context) {
+    let user = ctx.username.lock().unwrap();
     let user_field = EditView::new()
-        .content(&ctx.username)
+        .content(user.clone())
         .with_name("connect_user");
     let pass_field = EditView::new().secret().with_name("connect_pass");
     let pass_form = LinearLayout::horizontal().child(pass_field);

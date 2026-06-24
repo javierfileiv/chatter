@@ -3,3 +3,4 @@ target/
 .venv
 .history/
 __pycache__/
+.vscode/

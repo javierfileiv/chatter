@@ -2,9 +2,10 @@ use cursive::{
     align::HAlign,
     theme::{BaseColor, Color},
     traits::*,
-    views::{Dialog, DummyView, EditView, LinearLayout, Panel, ScrollView, TextView},
+    views::{Dialog, DummyView, EditView, HideableView, LinearLayout, Panel, ScrollView, TextView},
     View,
 };
+use cursive_flexi_logger_view::FlexiLoggerView;
 use std::sync::Arc;
 
 use crate::Context;
@@ -66,6 +67,7 @@ pub fn build_notification() -> Box<dyn View> {
         Dialog::around(
             TextView::new("Here notifications")
                 .h_align(HAlign::Right)
+                .style(Color::Dark(BaseColor::Blue))
                 .with_name("notification")
                 .min_width(10)
                 .max_height(3)
@@ -75,11 +77,20 @@ pub fn build_notification() -> Box<dyn View> {
     )
 }
 
+pub fn build_logger_view() -> Box<dyn View> {
+    let logger = FlexiLoggerView::scrollable().fixed_height(10);
+    let mut logger = HideableView::new(logger);
+    logger.set_visible(false);
+    Box::new(logger.with_name("logger_panel"))
+}
+
 pub fn build_help() -> Box<dyn View> {
     Box::new(
         Panel::new(
-            TextView::new("ESC:quit | Enter:send | Commands: /help, /clear, /connect, /quit")
-                .style(Color::Dark(BaseColor::White)),
+            TextView::new(
+                "ESC:quit | Enter:send | Commands: /help, /clear, /connect, /debug, /quit",
+            )
+            .style(Color::Dark(BaseColor::White)),
         )
         .full_width(),
     )
@@ -91,18 +102,20 @@ pub fn assemble_layout(
     input: Box<dyn View>,
     help_text: Box<dyn View>,
     notification: Box<dyn View>,
+    logger_panel: Box<dyn View>,
 ) -> Box<dyn View> {
-    let layout = LinearLayout::vertical()
+    let content = LinearLayout::vertical()
         .child(header)
         .child(messages)
         .child(input)
         .child(help_text)
-        .child(notification);
+        .child(notification)
+        .child(logger_panel);
 
     Box::new(
         LinearLayout::horizontal()
             .child(DummyView.full_width())
-            .child(layout)
+            .child(content)
             .child(DummyView.full_width()),
     )
 }
