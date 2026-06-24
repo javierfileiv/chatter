@@ -182,7 +182,6 @@ Three GitHub Actions workflows run on push/PR to main/master:
 
 ### Known Gaps
 
-- **Connection handler** — hardcodes username/password/room instead of deserializing the first WebSocket frame via `common::ws_messages`.
 - **Auth** — `server/src/auth/client.rs` always returns `true`.
 - **Client** — TUI is implemented (commands, dialogs, layout) but WebSocket connection is still WIP.
 
