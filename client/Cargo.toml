@@ -14,3 +14,4 @@ chrono = { workspace = true }
 flexi_logger = { workspace = true }
 log = { workspace = true }
 common = { workspace = true }
+cursive-flexi-logger-view = "0.6.0"

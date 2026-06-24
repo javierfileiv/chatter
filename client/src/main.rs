@@ -1,12 +1,10 @@
+use clap::Parser;
 use flexi_logger::{Duplicate, FileSpec, Logger};
 use log::info;
+use std::error::Error;
 use std::net::IpAddr;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
-
-use clap::Parser;
-
-use std::error::Error;
 
 mod commands;
 mod theme;
@@ -101,15 +99,17 @@ impl Context {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
+    let mut siv = cursive::default();
     let args = Args::parse();
     Logger::try_with_str("info")?
         .format_for_files(flexi_logger::detailed_format)
         .format_for_stderr(flexi_logger::detailed_format)
-        .log_to_file(
+        .log_to_file_and_writer(
             FileSpec::default()
                 .directory(args.log_dir)
                 .basename("client")
                 .suppress_timestamp(),
+            cursive_flexi_logger_view::cursive_flexi_logger(&siv),
         )
         .append()
         .duplicate_to_stderr(Duplicate::Warn)
@@ -126,13 +126,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let ip_addr = ctx.server_ip.parse::<IpAddr>().expect("Invalid IP address");
     let socket_addr = SocketAddr::new(ip_addr, ctx.server_port);
 
-    println!(
+    info!(
         "user {}, pass {}, addr {socket_addr:?}",
         ctx.username.lock().unwrap(),
         ctx.password.lock().unwrap()
     );
-
-    let mut siv = cursive::default();
     siv.set_theme(theme::create_retro_theme());
 
     ui::make_ui(&mut siv, &ctx);
