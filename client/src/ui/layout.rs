@@ -66,6 +66,7 @@ pub fn build_notification() -> Box<dyn View> {
         Dialog::around(
             TextView::new("Here notifications")
                 .h_align(HAlign::Right)
+                .style(Color::Dark(BaseColor::Blue))
                 .with_name("notification")
                 .min_width(10)
                 .max_height(3)
