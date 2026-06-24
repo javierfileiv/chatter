@@ -1,10 +1,46 @@
+use crate::network;
+use crate::Context;
 use cursive::{
     traits::*,
     views::{Dialog, EditView, LinearLayout, TextView},
-    Cursive,
+    CbSink, Cursive,
 };
+use log::info;
+use std::sync::Arc;
+fn do_connect(siv: &mut Cursive) {
+    let ctx = siv.user_data::<Arc<Context>>().unwrap().clone();
+    let cb_sink: CbSink = siv.cb_sink().clone();
+    let username = siv.call_on_name("connect_user", |v: &mut EditView| v.get_content());
+    let password = siv.call_on_name("connect_pass", |v: &mut EditView| v.get_content());
+    let room_to_join = siv.call_on_name("connect_room", |v: &mut EditView| v.get_content());
 
-use crate::Context;
+    let (username, password, room_to_join) = match (username, password, room_to_join) {
+        (Some(u), Some(p), Some(r)) => {
+            siv.pop_layer();
+            (u, p, r)
+        }
+        _ => {
+            siv.pop_layer();
+            return;
+        }
+    };
+    // Create socket and message.
+    let url = format!("ws://{}:{}", ctx.server_ip, ctx.server_port);
+    info!("Connecting {} to {}, room: {}", username, url, room_to_join);
+
+    // connection::connect_to_server(ctx,
+    siv.pop_layer();
+    tokio::spawn(async move {
+        // spawn pour l'async
+        network::connect_to_server(
+            ctx,
+            cb_sink,
+            username.to_string(),
+            password.to_string(),
+            room_to_join.to_string(),
+        );
+    });
+}
 
 pub fn show_connect_dialog(siv: &mut Cursive, ctx: &Context) {
     let user = ctx.username.lock().unwrap();
@@ -13,7 +49,9 @@ pub fn show_connect_dialog(siv: &mut Cursive, ctx: &Context) {
         .with_name("connect_user");
     let pass_field = EditView::new().secret().with_name("connect_pass");
     let pass_form = LinearLayout::horizontal().child(pass_field);
-    let room_field = EditView::new().with_name("connect_room");
+    let room_field = EditView::new()
+        .content(ctx.room.lock().unwrap().clone())
+        .with_name("connect_room");
     let form = LinearLayout::vertical()
         .child(TextView::new("Username:"))
         .child(user_field)
@@ -24,20 +62,7 @@ pub fn show_connect_dialog(siv: &mut Cursive, ctx: &Context) {
     let dialog = Dialog::new()
         .title("Connect to server")
         .content(form)
-        .button("Connect", |s| {
-            let _user = s
-                .call_on_name("connect_user", |v: &mut EditView| v.get_content())
-                .unwrap();
-            let _pass = s
-                .call_on_name("connect_pass", |v: &mut EditView| v.get_content())
-                .unwrap();
-            let _room = s
-                .call_on_name("connect_room", |v: &mut EditView| v.get_content())
-                .unwrap();
-
-            // TODO: WebSocket connect + auth + join room
-            s.pop_layer();
-        })
+        .button("Connect", do_connect)
         .button("Cancel", |s| {
             s.pop_layer();
         });

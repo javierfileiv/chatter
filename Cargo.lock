@@ -237,6 +237,7 @@ dependencies = [
  "cursive",
  "cursive-flexi-logger-view",
  "flexi_logger",
+ "futures-util",
  "log",
  "serde_json",
  "tokio",

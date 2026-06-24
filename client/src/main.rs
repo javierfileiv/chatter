@@ -5,8 +5,10 @@ use std::error::Error;
 use std::net::IpAddr;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
+use tokio::sync::mpsc::UnboundedSender;
 
 mod commands;
+mod network;
 mod theme;
 mod ui;
 
@@ -56,10 +58,9 @@ struct Context {
     // variable field during life app
     pub username: Mutex<String>,
     pub password: Mutex<String>,
-    #[expect(dead_code)]
     pub connected: Mutex<bool>,
-    #[expect(dead_code)]
     pub room: Mutex<String>,
+    pub tx_msg: Mutex<Option<UnboundedSender<String>>>,
 }
 
 impl Context {
@@ -77,6 +78,7 @@ impl Context {
             password: Mutex::new(password.unwrap_or_default()),
             connected: Mutex::new(false),
             room: Mutex::new(room),
+            tx_msg: Mutex::new(None),
         };
         info!(
             "Starting client — user: {}, server: {}:{}",
@@ -132,7 +134,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
         ctx.password.lock().unwrap()
     );
     siv.set_theme(theme::create_retro_theme());
-
+    // Pass context as user data for callbacks.
+    siv.set_user_data(ctx.clone());
     ui::make_ui(&mut siv, &ctx);
 
     siv.run();
