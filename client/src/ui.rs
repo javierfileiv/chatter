@@ -1,8 +1,6 @@
-use std::sync::Arc;
-
-use cursive::{views, Cursive};
-
 use crate::Context;
+use cursive::{views, Cursive};
+use std::sync::Arc;
 
 pub mod dialogs;
 pub mod layout;
