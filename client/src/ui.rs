@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 pub mod dialogs;
 pub mod layout;
+pub mod status;
 
 pub fn make_ui(siv: &mut Cursive, ctx: &Arc<Context>) {
     let header = layout::build_header(ctx);

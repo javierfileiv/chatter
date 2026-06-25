@@ -31,7 +31,7 @@ pub fn connect_to_server(
                         info!("Connected as {username}, handling connection...");
                         // save room name, credentials and update connection status
                         *ctx.connected.lock().unwrap() = true;
-                        notify_connection_status(&cb_sink, true);
+                        crate::ui::status::notify_connection_status(&cb_sink, true);
                         handle_connection(ctx, ws_stream, cb_sink);
                     }
                     Err(e) => {
@@ -92,17 +92,17 @@ async fn ws_half_reader(
                 Ok(Message::Close(_)) => {
                     info!("connection closed");
                     *ctx.connected.lock().unwrap() = false;
-                    notify_connection_status(&cb_sink, false);
+                    crate::ui::status::notify_connection_status(&cb_sink, false);
                 }
                 Err(Error::ConnectionClosed) => {
                     error!("connection closed");
                     *ctx.connected.lock().unwrap() = false;
-                    notify_connection_status(&cb_sink, false);
+                    crate::ui::status::notify_connection_status(&cb_sink, false);
                 }
                 Err(e) => {
                     error!("Network error: {}", e);
                     *ctx.connected.lock().unwrap() = false;
-                    notify_connection_status(&cb_sink, false);
+                    crate::ui::status::notify_connection_status(&cb_sink, false);
                 }
                 _ => {}
             }
@@ -111,26 +111,3 @@ async fn ws_half_reader(
 }
 
 async fn ws_half_writer(_ctx: Arc<Context>, _rx: UnboundedReceiver<String>, _cb_sink: CbSink) {}
-
-fn notify_connection_status(cb_sink: &CbSink, connected: bool) {
-    match connected {
-        true => {
-            cb_sink
-                .send(Box::new(move |s| {
-                    s.call_on_name("notification", |view: &mut TextView| {
-                        view.set_content("Connected")
-                    });
-                }))
-                .ok();
-        }
-        false => {
-            cb_sink
-                .send(Box::new(move |s| {
-                    s.call_on_name("notification", |view: &mut TextView| {
-                        view.set_content("Disconnected")
-                    });
-                }))
-                .ok();
-        }
-    }
-}
