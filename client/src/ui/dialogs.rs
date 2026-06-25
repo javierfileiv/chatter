@@ -28,18 +28,15 @@ fn do_connect(siv: &mut Cursive) {
     let url = format!("ws://{}:{}", ctx.server_ip, ctx.server_port);
     info!("Connecting {} to {}, room: {}", username, url, room_to_join);
 
-    // connection::connect_to_server(ctx,
     siv.pop_layer();
-    tokio::spawn(async move {
-        // spawn pour l'async
-        network::connect_to_server(
-            ctx,
-            cb_sink,
-            username.to_string(),
-            password.to_string(),
-            room_to_join.to_string(),
-        );
-    });
+    // spawn pour l'async
+    network::connect_to_server(
+        ctx,
+        cb_sink,
+        username.to_string(),
+        password.to_string(),
+        room_to_join.to_string(),
+    );
 }
 
 pub fn show_connect_dialog(siv: &mut Cursive, ctx: &Context) {

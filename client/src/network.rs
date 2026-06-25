@@ -32,7 +32,7 @@ pub fn connect_to_server(
                         // save room name, credentials and update connection status
                         *ctx.connected.lock().unwrap() = true;
                         crate::ui::status::notify_connection_status(&cb_sink, true);
-                        handle_connection(ctx, ws_stream, cb_sink);
+                        handle_connection(ctx, ws_stream, cb_sink).await;
                     }
                     Err(e) => {
                         let err = format!("Handshake failed: {e}");
@@ -60,21 +60,20 @@ pub fn connect_to_server(
     });
 }
 
-fn handle_connection(ctx: Arc<Context>, ws: WebSocketStream<TcpStream>, cb_sink: CbSink) {
+async fn handle_connection(ctx: Arc<Context>, ws: WebSocketStream<TcpStream>, cb_sink: CbSink) {
     let (_writer, reader) = ws.split();
 
     let (tx, rx) = unbounded_channel::<String>();
+    // Save tx channel in context for "input" TextView to send messages to server.
     *ctx.tx_msg.lock().unwrap() = Some(tx);
 
     let r = ws_half_reader(ctx.clone(), reader, cb_sink.clone());
     let w = ws_half_writer(ctx.clone(), rx, cb_sink.clone());
 
-    tokio::spawn(async move {
-        select! {
+    select! {
         _ = r => info!("{} reader closed", ctx.username.lock().unwrap()),
         _ = w => info!("{} writer closed", ctx.username.lock().unwrap()),
-        }
-    });
+    }
 }
 
 async fn ws_half_reader(
