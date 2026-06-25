@@ -7,6 +7,8 @@ use cursive::{
 };
 use log::info;
 use std::sync::Arc;
+
+pub fn add_broadcast_msg(_cb_sink: &CbSink, _msg: String) {}
 fn do_connect(siv: &mut Cursive) {
     let ctx = siv.user_data::<Arc<Context>>().unwrap().clone();
     let cb_sink: CbSink = siv.cb_sink().clone();
@@ -24,19 +26,14 @@ fn do_connect(siv: &mut Cursive) {
             return;
         }
     };
-    // Create socket and message.
     let url = format!("ws://{}:{}", ctx.server_ip, ctx.server_port);
     info!("Connecting {} to {}, room: {}", username, url, room_to_join);
 
-    siv.pop_layer();
-    // spawn pour l'async
-    network::connect_to_server(
-        ctx,
-        cb_sink,
-        username.to_string(),
-        password.to_string(),
-        room_to_join.to_string(),
-    );
+    // save user values
+    *ctx.username.lock().unwrap() = username.to_string();
+    *ctx.password.lock().unwrap() = password.to_string();
+    *ctx.room.lock().unwrap() = room_to_join.to_string();
+    network::connect_to_server(ctx, cb_sink);
 }
 
 pub fn show_connect_dialog(siv: &mut Cursive, ctx: &Context) {

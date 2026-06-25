@@ -28,7 +28,7 @@ pub struct Logout {
 }
 
 /// Messages the client can send to the server via WebSocket
-#[derive(Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type")]
 #[serde(deny_unknown_fields)]
 pub enum ClientMessage {
@@ -44,7 +44,7 @@ pub enum ClientMessage {
 }
 
 /// Messages the server can send to the client via WebSocket
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type")]
 #[serde(deny_unknown_fields)]
 pub enum ServerMessage {
@@ -64,7 +64,7 @@ pub enum ServerMessage {
     // Server communicates something
     #[serde(rename = "notification")]
     Notification { value: String, timestamp: String },
-    // Some error sent in the server
+    // Some error in the server
     #[serde(rename = "error")]
     Error { value: String },
 }
