@@ -1,4 +1,5 @@
 use crate::network;
+use crate::ui;
 use crate::Context;
 use cursive::{
     traits::*,
@@ -31,6 +32,7 @@ fn do_connect(siv: &mut Cursive) {
             (u, p, r)
         }
         _ => {
+            ui::dialogs::set_notification(&cb_sink, "Invalid credentials");
             siv.pop_layer();
             return;
         }
