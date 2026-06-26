@@ -58,12 +58,9 @@ fn do_connect(siv: &mut Cursive) {
     let room_to_join = siv.call_on_name("connect_room", |v: &mut EditView| v.get_content());
 
     let (username, password, room_to_join) = match (username, password, room_to_join) {
-        (Some(u), Some(p), Some(r)) => {
-            siv.pop_layer();
-            (u, p, r)
-        }
+        (Some(u), Some(p), Some(r)) if !u.is_empty() && !p.is_empty() && !r.is_empty() => (u, p, r),
         _ => {
-            ui::dialogs::set_notification(&cb_sink, "Invalid credentials");
+            ui::dialogs::set_notification(&cb_sink, "All credentials fields are required");
             siv.pop_layer();
             return;
         }
