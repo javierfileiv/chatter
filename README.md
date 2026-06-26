@@ -14,6 +14,7 @@ A real-time chat application built with Rust, using WebSocket for client-server 
 - Toggleable debug log panel (`/debug`) powered by flexi_logger
 - Live clock in the header UI (updates every second)
 - WebSocket connection with authentication handshake (timeout + error handling)
+- Bi-directional message sending: send messages to server and display broadcasted messages
 - Connection status display (Connected / Disconnected)
 - Server-side timestamps on all chat messages and notifications
 - User authentication (server stub — always accepts)
