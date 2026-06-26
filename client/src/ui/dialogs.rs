@@ -46,8 +46,14 @@ pub fn clear_input_view(cb_sink: &CbSink) {
         .ok();
 }
 
-// Add a broadcasted message recived from the user to the messages view.
-pub fn add_broadcast_msg(_cb_sink: &CbSink, _msg: String) {}
+// Add a broadcasted message recieved from the user to the messages view.
+pub fn add_broadcast_rx_msg(cb_sink: &CbSink, msg: String) {
+    cb_sink
+        .send(Box::new(move |s| {
+            s.call_on_name("messages", |view: &mut TextView| view.append(msg));
+        }))
+        .ok();
+}
 
 // Check user input and launch a new connection to server.
 fn do_connect(siv: &mut Cursive) {

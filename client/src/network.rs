@@ -182,7 +182,7 @@ fn handle_incoming_server_msg(cb_sink: &CbSink, ws_server_msg: String) {
                 message,
                 timestamp,
             } => {
-                ui::dialogs::add_broadcast_msg(
+                ui::dialogs::add_broadcast_rx_msg(
                     cb_sink,
                     format!("{}-{}:{}", timestamp, sender, message),
                 );
