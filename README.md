@@ -13,9 +13,11 @@ A real-time chat application built with Rust, using WebSocket for client-server 
 - Client commands: `/help`, `/clear`, `/connect`, `/debug`, `/quit`
 - Toggleable debug log panel (`/debug`) powered by flexi_logger
 - Live clock in the header UI (updates every second)
-- User authentication (stub — always accepts)
-- Disconnect notifications — remaining room members are notified when a client leaves
+- WebSocket connection with authentication handshake (timeout + error handling)
+- Connection status display (Connected / Disconnected)
 - Server-side timestamps on all chat messages and notifications
+- User authentication (server stub — always accepts)
+- Disconnect notifications — remaining room members are notified when a client leaves
 - Graceful and abrupt disconnect handling with automatic cleanup
 - Async I/O with Tokio
 
@@ -24,14 +26,17 @@ A real-time chat application built with Rust, using WebSocket for client-server 
 ```
 chatter/
 ├── client/                     # Terminal client crate (Cursive TUI)
-│   ├── src/main.rs             #   Entrypoint, CLI args, Context struct
+│   ├── src/app.rs              #   AppState struct (shared state — unused, replaced by Context)
+│   ├── src/main.rs             #   Entrypoint, CLI args, Context struct, flexi_logger init
 │   ├── src/commands.rs         #   Slash commands: /help, /clear, /connect, /debug, /quit
+│   ├── src/network.rs          #   WebSocket connection: connect, auth, reader/writer loops
 │   ├── src/theme.rs            #   Retro terminal color theme
 │   ├── src/ui.rs               #   TUI assembly, clock refresh callback, logger setup
 │   ├── src/ui/
-│   │   ├── layout.rs           #   Layout: header, messages, input, help, notification, logger
-│   │   └── dialogs.rs          #   Connect dialog (Enter to validate)
-│   └── Cargo.toml              #   edition = "2021", cursive, clap, chrono
+│   │   ├── dialogs.rs          #   Connect dialog, notification, message/input helpers
+│   │   ├── layout.rs           #   Layout: header, messages, input, footer, logger panel
+│   │   └── status.rs           #   Connection status view (Connected / Disconnected)
+│   └── Cargo.toml              #   edition = "2021", cursive, clap, chrono, tokio
 ├── common/                     # Shared library crate
 │   ├── src/lib.rs              #   Re-exports errors and ws_messages
 │   ├── src/ws_messages.rs      #   Serde structs: AuthenticateUser, SendMessage, Logout
@@ -86,7 +91,7 @@ client ──WebSocket──▶ server::core::server (accept loop)
 |-------|------|-----------------|
 | `common` | Shared message types & errors | `serde`, `serde_json`, `anyhow`, `tokio-util` |
 | `server` | WebSocket server + broker | `tokio` (full), `tokio-tungstenite`, `futures-util`, `flexi_logger`, `tracing` |
-| `client` | Terminal TUI client | `cursive`, `clap`, `chrono`, `tokio`, `flexi_logger`, `cursive-flexi-logger-view` |
+| `client` | Terminal TUI client | `cursive`, `clap`, `chrono`, `tokio`, `tokio-tungstenite`, `futures-util`, `flexi_logger`, `cursive-flexi-logger-view` |
 
 ## Getting Started
 
@@ -133,7 +138,7 @@ Cursive TUI with a retro terminal theme. Commands available in the chat:
 | `/debug` | Toggle the debug log panel (flexi_logger output) |
 | `/quit` | Exit the application |
 
-**Note:** The TUI is functional but not yet connected to the WebSocket backend (WIP).
+**Note:** The TUI connects to the WebSocket backend upon `/connect`; auth, reader, and writer loops run in background Tokio tasks.
 
 ## Development
 
@@ -184,8 +189,7 @@ Three GitHub Actions workflows run on push/PR to main/master:
 
 ### Known Gaps
 
-- **Auth** — `server/src/auth/client.rs` always returns `true`.
-- **Client** — TUI is implemented (commands, dialogs, layout, debug logger) but WebSocket connection is still WIP.
+- **Auth** — `server/src/auth/client.rs` always returns `true`; no password hashing yet.
 
 ## License
 
