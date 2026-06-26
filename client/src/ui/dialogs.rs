@@ -9,6 +9,7 @@ use cursive::{
 use log::info;
 use std::sync::Arc;
 
+// Display notification in view.
 pub fn set_notification(cb_sink: &CbSink, msg: &str) {
     let msg = msg.to_string();
     cb_sink
@@ -18,7 +19,37 @@ pub fn set_notification(cb_sink: &CbSink, msg: &str) {
         .ok();
 }
 
+// Clean notification view.
+pub fn clear_notification_view(cb_sink: &CbSink) {
+    cb_sink
+        .send(Box::new(move |s| {
+            s.call_on_name("notification", |view: &mut TextView| view.set_content(""));
+        }))
+        .ok();
+}
+
+// Clean input view.
+pub fn clear_messages_view(cb_sink: &CbSink) {
+    cb_sink
+        .send(Box::new(move |s| {
+            s.call_on_name("messages", |view: &mut TextView| view.set_content(""));
+        }))
+        .ok();
+}
+
+// Clean input view.
+pub fn clear_input_view(cb_sink: &CbSink) {
+    cb_sink
+        .send(Box::new(move |s| {
+            s.call_on_name("input", |view: &mut EditView| view.set_content(""));
+        }))
+        .ok();
+}
+
+// Add a broadcasted message recived from the user to the messages view.
 pub fn add_broadcast_msg(_cb_sink: &CbSink, _msg: String) {}
+
+// Check user input and launch a new connection to server.
 fn do_connect(siv: &mut Cursive) {
     let ctx = siv.user_data::<Arc<Context>>().unwrap().clone();
     let cb_sink: CbSink = siv.cb_sink().clone();
@@ -47,6 +78,7 @@ fn do_connect(siv: &mut Cursive) {
     network::connect_to_server(ctx, cb_sink);
 }
 
+// Opens a dialog to entre credentials for connection.
 pub fn show_connect_dialog(siv: &mut Cursive, ctx: &Context) {
     let user = ctx.username.lock().unwrap();
     let user_field = EditView::new()
