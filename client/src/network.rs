@@ -134,7 +134,7 @@ async fn ws_half_reader(
 
 async fn ws_half_writer(
     ctx: Arc<Context>,
-    _sink: SplitSink<WebSocketStream<TcpStream>, Message>,
+    mut sink: SplitSink<WebSocketStream<TcpStream>, Message>,
     mut rx_channel: UnboundedReceiver<String>,
     cb_sink: CbSink,
 ) {
@@ -142,11 +142,21 @@ async fn ws_half_writer(
         let user = ctx.get_user();
 
         // convert msg_from_user into JSON and send it through websocket 'sink'
-        let _msg_struct = SendMessage {
+        let msg_struct = ClientMessage::Broadcast(SendMessage {
             username: user.clone(),
             message: msg_from_user.clone(),
+        });
+
+        let Ok(json) = serde_json::to_string(&msg_struct) else {
+            error!("Serialization error");
+            continue;
         };
 
+        if let Err(e) = sink.send(Message::Text(json.into())).await {
+            error!("Error sending msg to server: {}", e);
+            ui::dialogs::set_notification(&cb_sink, "Error sending msg to server");
+            continue;
+        }
         // Update UI with the new sent message
         if cb_sink
             .send(Box::new(move |s| {
