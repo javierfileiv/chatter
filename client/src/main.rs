@@ -1,5 +1,5 @@
 use clap::Parser;
-use flexi_logger::{Duplicate, FileSpec, Logger};
+use flexi_logger::{FileSpec, Logger};
 use log::info;
 use std::error::Error;
 use std::net::IpAddr;
@@ -114,7 +114,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
             cursive_flexi_logger_view::cursive_flexi_logger(&siv),
         )
         .append()
-        .duplicate_to_stderr(Duplicate::Warn)
         .start()?;
 
     let ctx = Arc::new(Context::new(
