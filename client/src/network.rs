@@ -34,26 +34,16 @@ pub fn connect_to_server(ctx: Arc<Context>, cb_sink: CbSink) {
                     Err(e) => {
                         let err = format!("Handshake failed: {e}");
 
-                        *ctx.connected.lock().unwrap() = false;
-                        cb_sink
-                            .send(Box::new(move |s| {
-                                s.call_on_name("notification", |view: &mut TextView| {
-                                    view.set_content(err)
-                                });
-                            }))
-                            .ok();
+                        ui::status::set_connection_status(ctx, &cb_sink, false);
+                        ui::dialogs::set_notification(&cb_sink, &err);
                     }
                 }
             }
             Err(e) => {
                 let err = format!("{e}");
                 error!("{err}");
-                *ctx.connected.lock().unwrap() = false;
-                cb_sink
-                    .send(Box::new(move |s| {
-                        s.call_on_name("notification", |view: &mut TextView| view.set_content(err));
-                    }))
-                    .ok();
+                ui::status::set_connection_status(ctx, &cb_sink, false);
+                ui::dialogs::set_notification(&cb_sink, &err);
             }
         }
     });
@@ -61,7 +51,7 @@ pub fn connect_to_server(ctx: Arc<Context>, cb_sink: CbSink) {
 
 async fn handle_connection(ctx: Arc<Context>, ws: WebSocketStream<TcpStream>, cb_sink: CbSink) {
     let (mut writer, mut reader) = ws.split();
-    crate::ui::status::notify_message(&cb_sink, "Connecting...");
+    ui::dialogs::set_notification(&cb_sink, "Connecting...");
 
     let auth = ClientMessage::Authenticate(AuthenticateUser {
         username: ctx.username.lock().unwrap().clone(),
@@ -74,7 +64,7 @@ async fn handle_connection(ctx: Arc<Context>, ws: WebSocketStream<TcpStream>, cb
         let msg = "Error sending authentication to server";
 
         error!("{}", msg);
-        crate::ui::status::notify_message(&cb_sink, msg);
+        ui::dialogs::set_notification(&cb_sink, msg);
         return;
     }
     //wait for response
@@ -84,21 +74,21 @@ async fn handle_connection(ctx: Arc<Context>, ws: WebSocketStream<TcpStream>, cb
             _ => {
                 let msg = "Auth failed";
                 error!("{}", msg);
-                crate::ui::status::notify_message(&cb_sink, msg);
+                ui::dialogs::set_notification(&cb_sink, msg);
                 return;
             }
         },
         _ => {
             let msg = "Auth timeout";
             error!("{}", msg);
-            crate::ui::status::notify_message(&cb_sink, "Auth Timeout");
+            ui::dialogs::set_notification(&cb_sink, "Auth Timeout");
             return;
         }
     }
 
     // update connection status
-    *ctx.connected.lock().unwrap() = true;
-    crate::ui::status::notify_connection_status(&cb_sink, true);
+    ui::status::set_connection_status(ctx.clone(), &cb_sink, true);
+    ui::dialogs::set_notification(&cb_sink, "");
     let (tx, rx) = unbounded_channel::<String>();
     // Save tx channel in context for "input" TextView to send messages to server.
     *ctx.tx_msg.lock().unwrap() = Some(tx);
@@ -124,20 +114,20 @@ async fn ws_half_reader(
             }
             Ok(Message::Close(_)) => {
                 info!("connection closed");
-                *ctx.connected.lock().unwrap() = false;
-                crate::ui::status::notify_connection_status(&cb_sink, false);
+                ui::status::set_connection_status(ctx.clone(), &cb_sink, false);
             }
             Err(Error::ConnectionClosed) => {
                 error!("connection closed");
-                *ctx.connected.lock().unwrap() = false;
-                crate::ui::status::notify_connection_status(&cb_sink, false);
+                ui::status::set_connection_status(ctx.clone(), &cb_sink, false);
             }
             Err(e) => {
                 error!("Network error: {}", e);
-                *ctx.connected.lock().unwrap() = false;
-                crate::ui::status::notify_connection_status(&cb_sink, false);
+                ui::status::set_connection_status(ctx.clone(), &cb_sink, false);
             }
-            _ => {}
+            _ => {
+                error!("Unknown network error");
+                return;
+            }
         }
     }
 }
@@ -166,6 +156,7 @@ async fn ws_half_writer(
             }))
             .is_err()
         {
+            error!("Cursive TUI unknown error");
             break;
         }
     }
@@ -181,25 +172,31 @@ fn handle_incoming_server_msg(cb_sink: &CbSink, ws_server_msg: String) {
                 message,
                 timestamp,
             } => {
-                crate::ui::dialogs::add_broadcast_msg(
+                ui::dialogs::add_broadcast_msg(
                     cb_sink,
                     format!("{}-{}:{}", timestamp, sender, message),
                 );
             }
             ServerMessage::Notification {
-                value: _,
+                value,
                 timestamp: _,
-            } => {}
-            ServerMessage::Error { value: _ } => {}
+            } => {
+                ui::dialogs::set_notification(cb_sink, &value);
+            }
+            ServerMessage::Error { value } => {
+                let str = format!("Received Error ServerMessage: {}.", value);
+                error!("{}", str);
+                ui::dialogs::set_notification(cb_sink, &str);
+            }
             _ => {
                 let str = "Received wrong/unknown ServerMessage type.";
                 error!("{}", str);
-                ui::status::notify_message(cb_sink, str);
+                ui::dialogs::set_notification(cb_sink, str);
             }
         }
     } else {
         let str = "Unable to deserialize Server message.";
         error!("{}", str);
-        ui::status::notify_message(cb_sink, str);
+        ui::dialogs::set_notification(cb_sink, str);
     }
 }

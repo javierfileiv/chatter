@@ -62,19 +62,22 @@ pub fn build_input(ctx: &Arc<Context>) -> Box<dyn View> {
     )
 }
 
-pub fn build_notification() -> Box<dyn View> {
-    Box::new(
-        Dialog::around(
-            TextView::new("Here notifications")
-                .h_align(HAlign::Right)
-                .style(Color::Dark(BaseColor::Blue))
-                .with_name("notification")
-                .min_width(10)
-                .max_height(3)
-                .full_width(),
-        )
-        .full_width(),
-    )
+pub fn build_footer() -> Box<dyn View> {
+    let status = TextView::new("status: Disconnected")
+        .h_align(HAlign::Left)
+        .style(Color::Dark(BaseColor::Yellow))
+        .with_name("status")
+        .min_width(10)
+        .max_height(3)
+        .full_width();
+    let notif = TextView::new("")
+        .h_align(HAlign::Right)
+        .style(Color::Dark(BaseColor::Blue))
+        .with_name("notification")
+        .min_width(10)
+        .max_height(3)
+        .full_width();
+    Box::new(Dialog::around(LinearLayout::horizontal().child(status).child(notif)).full_width())
 }
 
 pub fn build_logger_view() -> Box<dyn View> {
@@ -101,7 +104,7 @@ pub fn assemble_layout(
     messages: Box<dyn View>,
     input: Box<dyn View>,
     help_text: Box<dyn View>,
-    notification: Box<dyn View>,
+    footer: Box<dyn View>,
     logger_panel: Box<dyn View>,
 ) -> Box<dyn View> {
     let content = LinearLayout::vertical()
@@ -109,7 +112,7 @@ pub fn assemble_layout(
         .child(messages)
         .child(input)
         .child(help_text)
-        .child(notification)
+        .child(footer)
         .child(logger_panel);
 
     Box::new(

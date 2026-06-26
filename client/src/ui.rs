@@ -11,17 +11,10 @@ pub fn make_ui(siv: &mut Cursive, ctx: &Arc<Context>) {
     let messages = layout::build_messages();
     let input = layout::build_input(ctx);
     let help_text = layout::build_help();
-    let notification = layout::build_notification();
+    let footer = layout::build_footer();
     let logger_panel = layout::build_logger_view();
 
-    let layout = layout::assemble_layout(
-        header,
-        messages,
-        input,
-        help_text,
-        notification,
-        logger_panel,
-    );
+    let layout = layout::assemble_layout(header, messages, input, help_text, footer, logger_panel);
     siv.add_fullscreen_layer(layout);
     siv.add_global_callback(cursive::event::Key::Esc, |s| s.quit());
 

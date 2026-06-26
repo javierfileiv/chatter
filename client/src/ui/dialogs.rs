@@ -8,6 +8,15 @@ use cursive::{
 use log::info;
 use std::sync::Arc;
 
+pub fn set_notification(cb_sink: &CbSink, msg: &str) {
+    let msg = msg.to_string();
+    cb_sink
+        .send(Box::new(move |s| {
+            s.call_on_name("notification", |view: &mut TextView| view.set_content(msg));
+        }))
+        .ok();
+}
+
 pub fn add_broadcast_msg(_cb_sink: &CbSink, _msg: String) {}
 fn do_connect(siv: &mut Cursive) {
     let ctx = siv.user_data::<Arc<Context>>().unwrap().clone();

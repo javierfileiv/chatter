@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::Context;
+use crate::{ui, Context};
 use cursive::{
     views::{EditView, HideableView, ResizedView, ScrollView, TextView},
     Cursive,
@@ -26,7 +26,7 @@ pub fn handle_send(siv: &mut Cursive, ctx: &Arc<Context>, msg: String) {
             });
         }
         "/connect" => {
-            crate::ui::dialogs::show_connect_dialog(siv, ctx);
+            ui::dialogs::show_connect_dialog(siv, ctx);
         }
         "/debug" => {
             siv.call_on_name(
