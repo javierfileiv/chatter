@@ -1,6 +1,6 @@
 use crate::{ui, Context};
 use common::ws_messages::{AuthenticateUser, ClientMessage, SendMessage, ServerMessage};
-use cursive::{views::TextView, CbSink};
+use cursive::{views::TextView, CbSink, Cursive};
 use futures_util::{
     stream::{SplitSink, SplitStream},
     SinkExt, StreamExt,
@@ -88,6 +88,12 @@ async fn handle_connection(ctx: Arc<Context>, ws: WebSocketStream<TcpStream>, cb
 
     // update connection status
     ui::status::set_connection_status(ctx.clone(), &cb_sink, true);
+    // Dismiss Connect dialog
+    cb_sink
+        .send(Box::new(|s: &mut Cursive| {
+            s.pop_layer();
+        }))
+        .ok();
     ui::dialogs::set_notification(&cb_sink, "");
     let (tx, rx) = unbounded_channel::<String>();
     // Save tx channel in context for "input" TextView to send messages to server.
