@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
-use crate::Context;
+use crate::{ui, Context};
 use cursive::{
-    views::{EditView, HideableView, ResizedView, ScrollView, TextView},
+    views::{HideableView, ResizedView, ScrollView, TextView},
     Cursive,
 };
 use cursive_flexi_logger_view::FlexiLoggerView;
@@ -12,6 +12,8 @@ pub fn handle_send(siv: &mut Cursive, ctx: &Arc<Context>, msg: String) {
         return;
     }
 
+    let cb_sink = siv.cb_sink().clone();
+    ui::dialogs::clear_notification_view(&cb_sink);
     match msg.as_str() {
         "/help" => {
             siv.call_on_name("messages", |view: &mut TextView| {
@@ -21,12 +23,11 @@ pub fn handle_send(siv: &mut Cursive, ctx: &Arc<Context>, msg: String) {
             });
         }
         "/clear" => {
-            siv.call_on_name("messages", |view: &mut TextView| {
-                view.set_content("");
-            });
+            ui::dialogs::clear_input_view(&cb_sink);
+            ui::dialogs::clear_messages_view(&cb_sink);
         }
         "/connect" => {
-            crate::ui::dialogs::show_connect_dialog(siv, ctx);
+            ui::dialogs::show_connect_dialog(siv, ctx);
         }
         "/debug" => {
             siv.call_on_name(
@@ -39,10 +40,16 @@ pub fn handle_send(siv: &mut Cursive, ctx: &Arc<Context>, msg: String) {
         "/quit" => {
             siv.quit();
         }
-        _ => {}
+        _ => {
+            // Send regular message to tx channel.
+            let guard = ctx.tx_msg.lock().unwrap();
+            if let Some(tx) = guard.as_ref() {
+                tx.send(msg).ok();
+            } else {
+                let cb_sink = siv.cb_sink().clone();
+                ui::dialogs::set_notification(&cb_sink, "Not connected — use /connect first");
+            }
+        }
     }
-
-    siv.call_on_name("input", |view: &mut EditView| {
-        view.set_content("");
-    });
+    ui::dialogs::clear_input_view(&cb_sink);
 }
