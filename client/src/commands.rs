@@ -1,5 +1,8 @@
 use std::sync::Arc;
 
+use chrono::Local;
+use common::ws_messages::{ClientMessage, Logout, SendMessage};
+
 use crate::{ui, Context};
 use cursive::{
     views::{HideableView, ResizedView, ScrollView, TextView},
@@ -38,15 +41,33 @@ pub fn handle_send(siv: &mut Cursive, ctx: &Arc<Context>, msg: String) {
             );
         }
         "/quit" => {
+            let logout = ClientMessage::Logout(Logout {
+                message: String::new(),
+            });
+            if let Ok(json) = serde_json::to_string(&logout) {
+                let guard = ctx.tx_msg.lock().unwrap();
+                if let Some(tx) = guard.as_ref() {
+                    tx.send(json).ok();
+                }
+            }
             siv.quit();
         }
         _ => {
-            // Send regular message to tx channel.
             let guard = ctx.tx_msg.lock().unwrap();
             if let Some(tx) = guard.as_ref() {
-                tx.send(msg).ok();
+                let username = ctx.username.lock().unwrap().clone();
+                let msg_struct = ClientMessage::Broadcast(SendMessage {
+                    username: username.clone(),
+                    message: msg.clone(),
+                });
+                if let Ok(json) = serde_json::to_string(&msg_struct) {
+                    tx.send(json).ok();
+                }
+                // Display locally with timestamp
+                let timestamp = Local::now().format("%d/%m/%Y %H:%M:%S").to_string();
+                let display = format!("{}-{}:{}", timestamp, username, msg);
+                ui::dialogs::display_message(&cb_sink, display);
             } else {
-                let cb_sink = siv.cb_sink().clone();
                 ui::dialogs::set_notification(&cb_sink, "Not connected — use /connect first");
             }
         }

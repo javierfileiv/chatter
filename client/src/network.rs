@@ -1,6 +1,5 @@
 use crate::{ui, Context};
-use chrono::Local;
-use common::ws_messages::{AuthenticateUser, ClientMessage, SendMessage, ServerMessage};
+use common::ws_messages::{AuthenticateUser, ClientMessage, ServerMessage};
 use cursive::{CbSink, Cursive};
 use futures_util::{
     stream::{SplitSink, SplitStream},
@@ -101,7 +100,7 @@ async fn handle_connection(ctx: Arc<Context>, ws: WebSocketStream<TcpStream>, cb
     *ctx.tx_msg.lock().unwrap() = Some(tx);
 
     let r = ws_half_reader(ctx.clone(), reader, cb_sink.clone());
-    let w = ws_half_writer(ctx.clone(), writer, rx, cb_sink.clone());
+    let w = ws_half_writer(writer, rx);
     select! {
         _ = r => info!("{} reader closed", ctx.username.lock().unwrap()),
         _ = w => info!("{} writer closed", ctx.username.lock().unwrap()),
@@ -140,41 +139,16 @@ async fn ws_half_reader(
 }
 
 async fn ws_half_writer(
-    ctx: Arc<Context>,
     mut sink: SplitSink<WebSocketStream<TcpStream>, Message>,
     mut rx_channel: UnboundedReceiver<String>,
-    cb_sink: CbSink,
 ) {
-    while let Some(msg_from_user) = rx_channel.recv().await {
-        let user = ctx.get_user();
-
-        // convert msg_from_user into JSON and send it through websocket 'sink'
-        let msg_struct = ClientMessage::Broadcast(SendMessage {
-            username: user.clone(),
-            message: msg_from_user.clone(),
-        });
-
-        let Ok(json) = serde_json::to_string(&msg_struct) else {
-            error!("Serialization error");
-            continue;
-        };
-
-        if let Err(e) = sink.send(Message::Text(json.into())).await {
+    while let Some(json_msg) = rx_channel.recv().await {
+        if let Err(e) = sink.send(Message::Text(json_msg.into())).await {
             error!("Error sending msg to server: {}", e);
-            ui::dialogs::set_notification(&cb_sink, "Error sending msg to server");
             continue;
         }
-        // Update UI with the new sent message
-        let timestamp = Local::now().format("%d/%m/%Y %H:%M:%S").to_string();
-        let msg_from_user = format!(
-            "{}-{}:{}",
-            timestamp,
-            ctx.username.lock().unwrap(),
-            msg_from_user
-        );
-        ui::dialogs::display_message(&cb_sink, msg_from_user);
     }
-    // Channel closed, what to do??
+    info!("Writer channel closed");
 }
 
 fn handle_incoming_server_msg(cb_sink: &CbSink, ws_server_msg: String) {
