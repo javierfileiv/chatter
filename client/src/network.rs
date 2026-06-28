@@ -191,11 +191,9 @@ fn handle_incoming_server_msg(cb_sink: &CbSink, ws_server_msg: String) {
                     format!("{}-{}:{}", timestamp, sender, message),
                 );
             }
-            ServerMessage::Notification {
-                value,
-                timestamp: _,
-            } => {
-                ui::dialogs::set_notification(cb_sink, &value);
+            ServerMessage::Notification { value, timestamp } => {
+                let msg = format!("{}: {}", timestamp, value);
+                ui::dialogs::set_notification(cb_sink, &msg);
             }
             ServerMessage::Error { value } => {
                 let str = format!("Received Error ServerMessage: {}.", value);
