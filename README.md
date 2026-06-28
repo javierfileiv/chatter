@@ -15,7 +15,8 @@ A real-time chat application built with Rust, using WebSocket for client-server 
 - Live clock in the header UI (updates every second)
 - WebSocket connection with authentication handshake (timeout + error handling)
 - Bi-directional message sending: send messages to server and display broadcasted messages
-- Connection status display (Connected / Disconnected)
+- Connection status and room display in footer
+- Logout notification on `/quit`
 - Server-side timestamps on all chat messages and notifications
 - User authentication (server stub — always accepts)
 - Disconnect notifications — remaining room members are notified when a client leaves
@@ -27,7 +28,6 @@ A real-time chat application built with Rust, using WebSocket for client-server 
 ```
 chatter/
 ├── client/                     # Terminal client crate (Cursive TUI)
-│   ├── src/app.rs              #   AppState struct (shared state — unused, replaced by Context)
 │   ├── src/main.rs             #   Entrypoint, CLI args, Context struct, flexi_logger init
 │   ├── src/commands.rs         #   Slash commands: /help, /clear, /connect, /debug, /quit
 │   ├── src/network.rs          #   WebSocket connection: connect, auth, reader/writer loops
@@ -36,7 +36,7 @@ chatter/
 │   ├── src/ui/
 │   │   ├── dialogs.rs          #   Connect dialog, notification, message/input helpers
 │   │   ├── layout.rs           #   Layout: header, messages, input, footer, logger panel
-│   │   └── status.rs           #   Connection status view (Connected / Disconnected)
+│   │   └── status.rs           #   Connection status + room display
 │   └── Cargo.toml              #   edition = "2021", cursive, clap, chrono, tokio
 ├── common/                     # Shared library crate
 │   ├── src/lib.rs              #   Re-exports errors and ws_messages
@@ -117,7 +117,7 @@ cargo run --bin server
 cargo run --bin server -- --port 3000 --log-dir /tmp/my-logs
 ```
 
-Logs are written to the specified directory (default: `logs/`) and echoed to stderr for warnings.
+Logs are written to the specified directory (default: `logs/`) and echoed to stdout.
 
 ### Run the Client
 
