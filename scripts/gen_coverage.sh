@@ -7,7 +7,7 @@ PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$PROJECT_DIR"
 
 # Regex for integration-only files (excluded from coverage report)
-IGNORE_REGEX="(server/src/main\.rs|server/src/core/server\.rs)"
+IGNORE_REGEX="(client/|server/src/main\.rs|server/src/core/server\.rs)"
 
 HTML=0
 OUTPUT_DIR=""
