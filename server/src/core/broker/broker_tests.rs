@@ -103,9 +103,20 @@ async fn test_broker_broadcast_success() {
         result.is_ok(),
         "The Broker should have received the Broadcast event"
     );
-    // No response sent back to sender — broadcast only goes to other clients
+    // Sender receives their own ChatMessage (broadcast goes to everyone in room)
     let resp = tokio::time::timeout(std::time::Duration::from_millis(100), rx.recv()).await;
-    assert!(resp.is_err(), "No response expected for sender");
+    match resp {
+        Ok(Some(BrokerToClientMsg::ChatMessage {
+            sender_name, text, ..
+        })) => {
+            assert_eq!(sender_name, "Alice");
+            assert_eq!(text, "Hello World");
+        }
+        other => panic!("Alice expected own ChatMessage, got {:?}", other),
+    }
+    // Nothing else
+    let resp = tokio::time::timeout(std::time::Duration::from_millis(100), rx.recv()).await;
+    assert!(resp.is_err(), "No second message expected for sender");
 }
 
 #[tokio::test]
@@ -141,9 +152,20 @@ async fn broadcast_to_multiple_clients_in_same_room() {
         })
         .unwrap();
 
-    // Alice receives nothing (broadcast only goes to other clients)
+    // Alice receives her own ChatMessage (broadcast goes to everyone in room)
     let resp = tokio::time::timeout(std::time::Duration::from_millis(100), rx_alice.recv()).await;
-    assert!(resp.is_err(), "Alice should not receive any response");
+    match resp {
+        Ok(Some(BrokerToClientMsg::ChatMessage {
+            sender_name, text, ..
+        })) => {
+            assert_eq!(sender_name, "Alice");
+            assert_eq!(text.to_string(), "Hi everyone!");
+        }
+        other => panic!("Alice expected own ChatMessage, got {:?}", other),
+    }
+    // Nothing else for Alice
+    let resp = tokio::time::timeout(std::time::Duration::from_millis(100), rx_alice.recv()).await;
+    assert!(resp.is_err(), "No second message for Alice");
 
     // Bob should receive Alice's chat message
     let resp = tokio::time::timeout(std::time::Duration::from_millis(100), rx_bob.recv()).await;
@@ -180,12 +202,20 @@ async fn broadcast_only_sender_in_room() {
         })
         .unwrap();
 
-    // Solo receives nothing (broadcast only goes to other clients, none here)
+    // Solo receives own ChatMessage (broadcast goes to everyone in room)
     let resp = tokio::time::timeout(std::time::Duration::from_millis(100), rx.recv()).await;
-    assert!(
-        resp.is_err(),
-        "No response expected for sender with no other clients"
-    );
+    match resp {
+        Ok(Some(BrokerToClientMsg::ChatMessage {
+            sender_name, text, ..
+        })) => {
+            assert_eq!(sender_name, "Solo");
+            assert_eq!(text.to_string(), "Nobody here");
+        }
+        other => panic!("Solo expected own ChatMessage, got {:?}", other),
+    }
+    // Nothing else
+    let resp = tokio::time::timeout(std::time::Duration::from_millis(100), rx.recv()).await;
+    assert!(resp.is_err(), "No second message for Solo");
 }
 
 #[tokio::test]
@@ -221,9 +251,15 @@ async fn broadcast_does_not_cross_rooms() {
         })
         .unwrap();
 
-    // Alice receives nothing (broadcast only goes to other clients)
+    // Alice receives own ChatMessage (broadcast goes to everyone in room)
     let resp = tokio::time::timeout(std::time::Duration::from_millis(100), rx_alice.recv()).await;
-    assert!(resp.is_err(), "Alice should not receive any response");
+    match resp {
+        Ok(Some(BrokerToClientMsg::ChatMessage { .. })) => {}
+        other => panic!("Alice expected own ChatMessage, got {:?}", other),
+    }
+    // Nothing else for Alice
+    let resp = tokio::time::timeout(std::time::Duration::from_millis(100), rx_alice.recv()).await;
+    assert!(resp.is_err(), "No second message for Alice");
 
     // Bob should NOT receive anything
     let resp = tokio::time::timeout(std::time::Duration::from_millis(100), rx_bob.recv()).await;

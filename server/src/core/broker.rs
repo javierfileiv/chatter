@@ -400,14 +400,8 @@ pub async fn run(mut rx_events: mpsc::UnboundedReceiver<BrokerEvent>) {
                 if let Some(sender_client) = ctx.clients.get(&sender_addr) {
                     if let Some(addr_list) = ctx.rooms.get(&sender_client.room_name) {
                         for &addr in addr_list.iter() {
-                            if addr != sender_client.addr {
-                                let broadcast_client = ctx.clients.get(&addr).unwrap();
-                                broadcast_client.send_message(
-                                    sender_client,
-                                    &str_message,
-                                    &timestamp,
-                                );
-                            }
+                            let broadcast_client = ctx.clients.get(&addr).unwrap();
+                            broadcast_client.send_message(sender_client, &str_message, &timestamp);
                         }
                     } else {
                         error!(

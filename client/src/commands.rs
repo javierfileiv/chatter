@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use chrono::Local;
 use common::ws_messages::{ClientMessage, Logout, SendMessage};
 
 use crate::{ui, Context};
@@ -63,10 +62,6 @@ pub fn handle_send(siv: &mut Cursive, ctx: &Arc<Context>, msg: String) {
                 if let Ok(json) = serde_json::to_string(&msg_struct) {
                     tx.send(json).ok();
                 }
-                // Display locally with timestamp
-                let timestamp = Local::now().format("%d/%m/%Y %H:%M:%S").to_string();
-                let display = format!("{}-{}:{}", timestamp, username, msg);
-                ui::dialogs::display_message(&cb_sink, display);
             } else {
                 ui::dialogs::set_notification(&cb_sink, "Not connected — use /connect first");
             }
