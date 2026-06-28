@@ -39,13 +39,6 @@ async fn check_response(rx_from_client: &mut UnboundedReceiver<BrokerToClientMsg
             }
             println!("JoinRoom Treated");
         }
-        Ok(Some(BrokerToClientMsg::Response(BrokerRsp::Broadcast { status }))) => {
-            assert!(status, "Broker has not broadcasted message");
-            println!("Broadcast Treated");
-        }
-        Ok(Some(BrokerToClientMsg::Response(BrokerRsp::Disconnect { status }))) => {
-            println!("Disconnect Treated (status: {})", status);
-        }
         Ok(Some(BrokerToClientMsg::ChatMessage {
             sender,
             sender_name,
@@ -110,7 +103,9 @@ async fn test_broker_broadcast_success() {
         result.is_ok(),
         "The Broker should have received the Broadcast event"
     );
-    check_response(&mut rx).await;
+    // No response sent back to sender — broadcast only goes to other clients
+    let resp = tokio::time::timeout(std::time::Duration::from_millis(100), rx.recv()).await;
+    assert!(resp.is_err(), "No response expected for sender");
 }
 
 #[tokio::test]
@@ -146,14 +141,9 @@ async fn broadcast_to_multiple_clients_in_same_room() {
         })
         .unwrap();
 
-    // Alice should receive broadcast ack
+    // Alice receives nothing (broadcast only goes to other clients)
     let resp = tokio::time::timeout(std::time::Duration::from_millis(100), rx_alice.recv()).await;
-    match resp {
-        Ok(Some(BrokerToClientMsg::Response(BrokerRsp::Broadcast { status }))) => {
-            assert!(status, "Broadcast ack should be true");
-        }
-        other => panic!("Alice expected broadcast ack, got {:?}", other),
-    }
+    assert!(resp.is_err(), "Alice should not receive any response");
 
     // Bob should receive Alice's chat message
     let resp = tokio::time::timeout(std::time::Duration::from_millis(100), rx_bob.recv()).await;
@@ -190,23 +180,11 @@ async fn broadcast_only_sender_in_room() {
         })
         .unwrap();
 
-    // Sender should receive broadcast ack
-    let resp = tokio::time::timeout(std::time::Duration::from_millis(100), rx.recv()).await;
-    match resp {
-        Ok(Some(BrokerToClientMsg::Response(BrokerRsp::Broadcast { status }))) => {
-            assert!(
-                status,
-                "Broadcast ack should be true even with no other clients"
-            );
-        }
-        other => panic!("Expected broadcast ack, got {:?}", other),
-    }
-
-    // No more messages should arrive (sender doesn't get their own message)
+    // Solo receives nothing (broadcast only goes to other clients, none here)
     let resp = tokio::time::timeout(std::time::Duration::from_millis(100), rx.recv()).await;
     assert!(
         resp.is_err(),
-        "No second message expected, sender should not receive own broadcast"
+        "No response expected for sender with no other clients"
     );
 }
 
@@ -243,14 +221,9 @@ async fn broadcast_does_not_cross_rooms() {
         })
         .unwrap();
 
-    // Alice gets ack
+    // Alice receives nothing (broadcast only goes to other clients)
     let resp = tokio::time::timeout(std::time::Duration::from_millis(100), rx_alice.recv()).await;
-    match resp {
-        Ok(Some(BrokerToClientMsg::Response(BrokerRsp::Broadcast { status }))) => {
-            assert!(status);
-        }
-        other => panic!("Alice expected broadcast ack, got {:?}", other),
-    }
+    assert!(resp.is_err(), "Alice should not receive any response");
 
     // Bob should NOT receive anything
     let resp = tokio::time::timeout(std::time::Duration::from_millis(100), rx_bob.recv()).await;
@@ -464,46 +437,6 @@ mod tryfrom_tests {
         assert!(matches!(
             result,
             ServerMessage::AuthResult { success: false, error: Some(ref e) } if e == "Connection failed"
-        ));
-    }
-
-    #[test]
-    fn tryfrom_broker_disconnect_success() {
-        let msg = BrokerToClientMsg::Response(BrokerRsp::Disconnect { status: true });
-        let result = ServerMessage::try_from(msg).unwrap();
-        assert!(matches!(
-            result,
-            ServerMessage::Notification { ref value, .. } if value == "Disconnected"
-        ));
-    }
-
-    #[test]
-    fn tryfrom_broker_disconnect_failure() {
-        let msg = BrokerToClientMsg::Response(BrokerRsp::Disconnect { status: false });
-        let result = ServerMessage::try_from(msg).unwrap();
-        assert!(matches!(
-            result,
-            ServerMessage::Error { ref value } if value == "Disconnect failed"
-        ));
-    }
-
-    #[test]
-    fn tryfrom_broker_broadcast_success() {
-        let msg = BrokerToClientMsg::Response(BrokerRsp::Broadcast { status: true });
-        let result = ServerMessage::try_from(msg).unwrap();
-        assert!(matches!(
-            result,
-            ServerMessage::Notification { ref value, .. } if value == "Message sent"
-        ));
-    }
-
-    #[test]
-    fn tryfrom_broker_broadcast_failure() {
-        let msg = BrokerToClientMsg::Response(BrokerRsp::Broadcast { status: false });
-        let result = ServerMessage::try_from(msg).unwrap();
-        assert!(matches!(
-            result,
-            ServerMessage::Error { ref value } if value == "Broadcast failed"
         ));
     }
 

@@ -259,8 +259,9 @@ async fn ws_half_writer_integration_notification() {
 
     let writer = ws_half_writer(sink, rx);
     let sender = async {
-        tx.send(BrokerToClientMsg::Response(BrokerRsp::Broadcast {
+        tx.send(BrokerToClientMsg::Response(BrokerRsp::JoinRoom {
             status: true,
+            created: true,
         }))
         .unwrap();
         drop(tx);
@@ -271,7 +272,7 @@ async fn ws_half_writer_integration_notification() {
             Message::Text(text) => {
                 let parsed: serde_json::Value = serde_json::from_str(&text).unwrap();
                 assert_eq!(parsed["type"], "notification");
-                assert_eq!(parsed["value"], "Message sent");
+                assert_eq!(parsed["value"], "Room created");
                 assert!(parsed["timestamp"].is_string());
             }
             other => panic!("expected Text message, got {other:?}"),
