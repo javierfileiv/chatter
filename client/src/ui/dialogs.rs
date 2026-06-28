@@ -46,8 +46,9 @@ pub fn clear_input_view(cb_sink: &CbSink) {
         .ok();
 }
 
-// Add a broadcasted message recieved from the user to the messages view.
-pub fn add_broadcast_rx_msg(cb_sink: &CbSink, msg: String) {
+// Display message in view.
+pub fn display_message(cb_sink: &CbSink, msg: String) {
+    let msg = format!("{msg}\n");
     cb_sink
         .send(Box::new(move |s| {
             s.call_on_name("messages", |view: &mut TextView| view.append(msg));

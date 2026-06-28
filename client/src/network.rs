@@ -1,6 +1,7 @@
 use crate::{ui, Context};
+use chrono::Local;
 use common::ws_messages::{AuthenticateUser, ClientMessage, SendMessage, ServerMessage};
-use cursive::{views::TextView, CbSink, Cursive};
+use cursive::{CbSink, Cursive};
 use futures_util::{
     stream::{SplitSink, SplitStream},
     SinkExt, StreamExt,
@@ -164,17 +165,14 @@ async fn ws_half_writer(
             continue;
         }
         // Update UI with the new sent message
-        if cb_sink
-            .send(Box::new(move |s| {
-                s.call_on_name("messages", |view: &mut TextView| {
-                    view.append(format!("{}:{}", user.clone(), msg_from_user.clone()));
-                });
-            }))
-            .is_err()
-        {
-            error!("Cursive TUI unknown error");
-            break;
-        }
+        let timestamp = Local::now().format("%d/%m/%Y %H:%M:%S").to_string();
+        let msg_from_user = format!(
+            "{}-{}:{}",
+            timestamp,
+            ctx.username.lock().unwrap(),
+            msg_from_user
+        );
+        ui::dialogs::display_message(&cb_sink, msg_from_user);
     }
     // Channel closed, what to do??
 }
@@ -188,7 +186,7 @@ fn handle_incoming_server_msg(cb_sink: &CbSink, ws_server_msg: String) {
                 message,
                 timestamp,
             } => {
-                ui::dialogs::add_broadcast_rx_msg(
+                ui::dialogs::display_message(
                     cb_sink,
                     format!("{}-{}:{}", timestamp, sender, message),
                 );
