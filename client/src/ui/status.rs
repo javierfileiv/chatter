@@ -16,6 +16,8 @@ pub fn set_connection_status(ctx: Arc<Context>, cb_sink: &CbSink, connected: boo
         false => {
             let msg = "Disconnected";
             *ctx.connected.lock().unwrap() = false;
+            // client tx channel if connection has dropped.
+            *ctx.tx_msg.lock().unwrap() = None;
             cb_sink
                 .send(Box::new(move |s| {
                     s.call_on_name("status", |view: &mut TextView| view.set_content(msg));
