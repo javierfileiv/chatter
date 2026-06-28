@@ -88,6 +88,8 @@ async fn handle_connection(ctx: Arc<Context>, ws: WebSocketStream<TcpStream>, cb
 
     // update connection status
     ui::status::set_connection_status(ctx.clone(), &cb_sink, true);
+    // update room name
+    ui::status::set_room_name(&cb_sink, &ctx.room.lock().unwrap().clone());
     // Dismiss Connect dialog
     cb_sink
         .send(Box::new(|s: &mut Cursive| {
