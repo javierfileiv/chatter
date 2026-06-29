@@ -46,8 +46,9 @@ pub fn clear_input_view(cb_sink: &CbSink) {
         .ok();
 }
 
-// Add a broadcasted message recieved from the user to the messages view.
-pub fn add_broadcast_rx_msg(cb_sink: &CbSink, msg: String) {
+// Display message in view.
+pub fn display_message(cb_sink: &CbSink, msg: String) {
+    let msg = format!("{msg}\n");
     cb_sink
         .send(Box::new(move |s| {
             s.call_on_name("messages", |view: &mut TextView| view.append(msg));
@@ -84,10 +85,14 @@ fn do_connect(siv: &mut Cursive) {
 // Opens a dialog to entre credentials for connection.
 pub fn show_connect_dialog(siv: &mut Cursive, ctx: &Context) {
     let user = ctx.username.lock().unwrap();
+    let password = ctx.password.lock().unwrap();
     let user_field = EditView::new()
         .content(user.clone())
         .with_name("connect_user");
-    let pass_field = EditView::new().secret().with_name("connect_pass");
+    let pass_field = EditView::new()
+        .secret()
+        .content(password.clone())
+        .with_name("connect_pass");
     let pass_form = LinearLayout::horizontal().child(pass_field);
     let room_field = EditView::new()
         .content(ctx.room.lock().unwrap().clone())

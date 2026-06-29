@@ -21,7 +21,8 @@ pub async fn run(listener: TcpListener, log_dir: &str) -> Result<(), Box<dyn std
                 .suppress_timestamp(),
         )
         .append()
-        .duplicate_to_stderr(Duplicate::Warn)
+        .duplicate_to_stdout(Duplicate::All)
+        .use_utc()
         .start()?;
 
     info!("Starting broker...");

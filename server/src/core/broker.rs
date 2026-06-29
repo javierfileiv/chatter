@@ -111,13 +111,6 @@ pub enum BrokerRsp {
         /// Final status
         status: bool,
     },
-    /// Response for when a client disconnects
-    Disconnect { status: bool },
-    /// Response for broadcasting a message to all clients
-    Broadcast {
-        /// Final status
-        status: bool,
-    },
     /// Response for creating a new room
     JoinRoom {
         /// Final status
@@ -186,30 +179,6 @@ impl TryFrom<BrokerToClientMsg> for ServerMessage {
                     Ok(ServerMessage::AuthResult {
                         success: false,
                         error: Some("Connection failed".to_string()),
-                    })
-                }
-            }
-            BrokerToClientMsg::Response(BrokerRsp::Disconnect { status }) => {
-                if status {
-                    Ok(ServerMessage::Notification {
-                        value: "Disconnected".to_string(),
-                        timestamp,
-                    })
-                } else {
-                    Ok(ServerMessage::Error {
-                        value: "Disconnect failed".to_string(),
-                    })
-                }
-            }
-            BrokerToClientMsg::Response(BrokerRsp::Broadcast { status }) => {
-                if status {
-                    Ok(ServerMessage::Notification {
-                        value: "Message sent".to_string(),
-                        timestamp,
-                    })
-                } else {
-                    Ok(ServerMessage::Error {
-                        value: "Broadcast failed".to_string(),
                     })
                 }
             }
@@ -431,21 +400,13 @@ pub async fn run(mut rx_events: mpsc::UnboundedReceiver<BrokerEvent>) {
                 if let Some(sender_client) = ctx.clients.get(&sender_addr) {
                     if let Some(addr_list) = ctx.rooms.get(&sender_client.room_name) {
                         for &addr in addr_list.iter() {
-                            if addr != sender_client.addr {
-                                let broadcast_client = ctx.clients.get(&addr).unwrap();
-                                broadcast_client.send_message(
-                                    sender_client,
-                                    &str_message,
-                                    &timestamp,
-                                );
-                            }
+                            let broadcast_client = ctx.clients.get(&addr).unwrap();
+                            broadcast_client.send_message(sender_client, &str_message, &timestamp);
                         }
-                        sender_client.send_response(BrokerRsp::Broadcast { status: true });
                     } else {
                         error!(
                             "This can't happen, room/addr_list was checked on Connect/JoinRoom events"
                         );
-                        sender_client.send_response(BrokerRsp::Broadcast { status: false });
                     }
                 }
             }

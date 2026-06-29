@@ -70,6 +70,10 @@ pub fn build_footer() -> Box<dyn View> {
         .min_width(10)
         .max_height(3)
         .full_width();
+    let room = TextView::new("")
+        .h_align(HAlign::Center)
+        .with_name("room_name")
+        .min_width(15);
     let notif = TextView::new("")
         .h_align(HAlign::Right)
         .style(Color::Dark(BaseColor::Blue))
@@ -77,7 +81,15 @@ pub fn build_footer() -> Box<dyn View> {
         .min_width(10)
         .max_height(3)
         .full_width();
-    Box::new(Dialog::around(LinearLayout::horizontal().child(status).child(notif)).full_width())
+    Box::new(
+        Dialog::around(
+            LinearLayout::horizontal()
+                .child(status)
+                .child(room)
+                .child(notif),
+        )
+        .full_width(),
+    )
 }
 
 pub fn build_logger_view() -> Box<dyn View> {

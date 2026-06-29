@@ -15,7 +15,11 @@ pub fn set_connection_status(ctx: Arc<Context>, cb_sink: &CbSink, connected: boo
         }
         false => {
             let msg = "Disconnected";
+            set_room_name(cb_sink, "");
+
             *ctx.connected.lock().unwrap() = false;
+            // client tx channel if connection has dropped.
+            *ctx.tx_msg.lock().unwrap() = None;
             cb_sink
                 .send(Box::new(move |s| {
                     s.call_on_name("status", |view: &mut TextView| view.set_content(msg));
@@ -23,4 +27,13 @@ pub fn set_connection_status(ctx: Arc<Context>, cb_sink: &CbSink, connected: boo
                 .ok();
         }
     }
+}
+
+pub fn set_room_name(cb_sink: &CbSink, room: &str) {
+    let msg = format!("Room: {}", room);
+    cb_sink
+        .send(Box::new(move |s| {
+            s.call_on_name("room_name", |view: &mut TextView| view.set_content(msg));
+        }))
+        .ok();
 }

@@ -38,7 +38,7 @@ struct Args {
         short = 'p',
         long = "port",
         help = "Server port number",
-        default_value = "8080"
+        default_value = "1234"
     )]
     server_port: u16,
     #[arg(
@@ -128,9 +128,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let socket_addr = SocketAddr::new(ip_addr, ctx.server_port);
 
     info!(
-        "user {}, pass {}, addr {socket_addr:?}",
+        "user {}, addr {socket_addr:?}",
         ctx.username.lock().unwrap(),
-        ctx.password.lock().unwrap()
     );
     siv.set_theme(theme::create_retro_theme());
     // Pass context as user data for callbacks.
