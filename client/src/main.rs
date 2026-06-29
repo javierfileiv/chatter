@@ -38,7 +38,7 @@ struct Args {
         short = 'p',
         long = "port",
         help = "Server port number",
-        default_value = "8080"
+        default_value = "1234"
     )]
     server_port: u16,
     #[arg(

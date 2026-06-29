@@ -8,7 +8,7 @@ use tokio::net::TcpListener;
 #[derive(Parser, Debug)]
 #[command(name = "chatter-server", about = "WebSocket chat server")]
 struct Args {
-    #[arg(short, long, default_value = "8080")]
+    #[arg(short, long, default_value = "1234")]
     port: u16,
     #[arg(short, long, default_value = "logs")]
     log_dir: String,
