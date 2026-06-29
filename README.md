@@ -18,7 +18,7 @@ A real-time chat application built with Rust, using WebSocket for client-server 
 - Connection status and room display in footer
 - Logout notification on `/quit`
 - Server-side timestamps on all chat messages and notifications
-- User authentication (server stub — always accepts)
+- User authentication — new users are auto-registered, returning users must match password
 - Disconnect notifications — remaining room members are notified when a client leaves
 - Graceful and abrupt disconnect handling with automatic cleanup
 - Async I/O with Tokio
@@ -80,7 +80,7 @@ client ──WebSocket──▶ server::core::server (accept loop)
                           │
                           ▼
                     server::core::connection (per-connection task)
-                          │  authenticate (stub)
+                          │  authenticate (auto-register if new user)
                           │  read incoming frames
                           ▼
                     server::core::broker (central event loop)
@@ -89,6 +89,15 @@ client ──WebSocket──▶ server::core::server (accept loop)
                           ▼
                     BrokerToClientMsg → back to connection → WebSocket → client
 ```
+
+### Auto-registration
+
+The server stores credentials in an in-memory `HashMap`. When a client connects :
+
+1. **New user** — username not in the map → credentials are stored and authentication succeeds
+2. **Returning user** — username exists → password must match, otherwise authentication fails
+
+No separate registration step is needed. The map is lost when the server restarts (no disk persistence).
 
 | Crate | Role | Key Dependencies |
 |-------|------|-----------------|
@@ -206,7 +215,8 @@ Three GitHub Actions workflows run on push/PR to main/master:
 
 ### Known Gaps
 
-- **Auth** — `server/src/auth/client.rs` always returns `true`; no password hashing yet.
+- **Password storage** — credentials are stored in plain text (in-memory HashMap); no argon2 hashing yet.
+- **Persistence** — user database is lost when the server restarts.
 
 ## License
 
