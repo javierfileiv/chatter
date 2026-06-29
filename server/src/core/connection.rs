@@ -12,7 +12,7 @@ use tokio::select;
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use tokio_tungstenite::tungstenite::{Error, Message};
 
-// Parse client raw JSON and convert it to a broker authentication request.
+// Parse client raw JSON and check if it's a valid authenticate message.
 fn parse_authenticate(raw: &str) -> Result<AuthenticateUser, ServerMessage> {
     match serde_json::from_str::<ClientMessage>(raw) {
         Ok(ClientMessage::Authenticate(auth)) => Ok(auth),
