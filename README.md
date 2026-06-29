@@ -66,6 +66,8 @@ chatter/
 │   └── integration.yml         #   Python integration tests
 ├── Cargo.toml                  # Workspace manifest (3 members)
 ├── Cargo.lock
+├── Dockerfile                  # Multi-stage Docker build (server only)
+├── .dockerignore               # Files excluded from Docker context
 ├── .pre-commit-config.yaml     # fmt + clippy hooks
 ├── tools/requirements.txt      # pre-commit (Python)
 └── AGENTS.md                   # Agent-specific development notes
@@ -118,6 +120,20 @@ cargo run --bin server -- --port 3000 --log-dir /tmp/my-logs
 ```
 
 Logs are written to the specified directory (default: `logs/`) and echoed to stdout.
+
+### Run with Docker
+
+Build the image:
+
+```bash
+docker build -t chatter-server .
+```
+
+Run the server container (port 1234 exposed):
+
+```bash
+docker run -p 1234:1234 chatter-server
+```
 
 ### Run the Client
 

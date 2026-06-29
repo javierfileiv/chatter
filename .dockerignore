@@ -1,0 +1,6 @@
+target/
+.git/
+logs/
+.github/
+AGENTS.md
+*.md
