@@ -159,7 +159,9 @@ where
     if !client::authenticate(&str_id, &password) {
         let response = ServerMessage::AuthResult {
             success: false,
-            error: Some("Authentication failed".to_string()),
+            error: Some(
+                "Authentication failed. Either the user exists, either wrong password.".to_string(),
+            ),
         };
         let json = serde_json::to_string(&response).unwrap();
         let _ = sink.send(Message::Text(json.into())).await;

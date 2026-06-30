@@ -98,6 +98,8 @@ The server stores credentials in an in-memory `HashMap`. When a client connects 
 1. **New user** — username not in the map → credentials are stored and authentication succeeds
 2. **Returning user** — username exists → password must match, otherwise authentication fails
 
+Usernames are unique : two clients cannot share the same username.
+
 No separate registration step is needed. The map is lost when the server restarts (no disk persistence).
 
 | Crate | Role | Key Dependencies |
