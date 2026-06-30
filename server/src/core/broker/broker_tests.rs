@@ -541,41 +541,4 @@ mod tryfrom_tests {
             if value == "user left" && timestamp == "17/06/2026 18:30:00"
         ));
     }
-
-    #[test]
-    fn tryfrom_server_to_broker_chat() {
-        let msg = ServerMessage::Chat {
-            sender: "alice".to_string(),
-            message: "hello".to_string(),
-            timestamp: "17/06/2026 18:30:00".to_string(),
-        };
-        let result = BrokerToClientMsg::try_from(msg).unwrap();
-        assert!(
-            matches!(result, BrokerToClientMsg::ChatMessage { ref sender_name, ref text, ref timestamp, .. }
-            if sender_name == "alice" && text == "hello" && timestamp == "17/06/2026 18:30:00")
-        );
-    }
-
-    #[test]
-    fn tryfrom_server_to_broker_notification() {
-        let msg = ServerMessage::Notification {
-            value: "hello".to_string(),
-            timestamp: "17/06/2026 18:30:00".to_string(),
-        };
-        let result = BrokerToClientMsg::try_from(msg).unwrap();
-        assert!(
-            matches!(result, BrokerToClientMsg::Notification { ref text, ref timestamp } if text == "hello" && timestamp == "17/06/2026 18:30:00")
-        );
-    }
-
-    #[test]
-    fn tryfrom_server_to_broker_error() {
-        let msg = ServerMessage::Error {
-            value: "oops".to_string(),
-        };
-        let result = BrokerToClientMsg::try_from(msg).unwrap();
-        assert!(
-            matches!(result, BrokerToClientMsg::Notification { ref text, .. } if text == "Error: oops")
-        );
-    }
 }

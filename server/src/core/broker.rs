@@ -214,36 +214,6 @@ impl TryFrom<BrokerToClientMsg> for ServerMessage {
     }
 }
 
-impl TryFrom<ServerMessage> for BrokerToClientMsg {
-    type Error = String;
-
-    fn try_from(msg: ServerMessage) -> Result<Self, Self::Error> {
-        match msg {
-            ServerMessage::Chat {
-                sender,
-                message,
-                timestamp,
-            } => Ok(BrokerToClientMsg::ChatMessage {
-                sender: SocketAddr::from(([0, 0, 0, 0], 0)),
-                sender_name: sender,
-                text: message,
-                timestamp,
-            }),
-            ServerMessage::Notification { value, timestamp } => {
-                Ok(BrokerToClientMsg::Notification {
-                    text: value,
-                    timestamp,
-                })
-            }
-            ServerMessage::Error { value } => Ok(BrokerToClientMsg::Notification {
-                text: format!("Error: {}", value),
-                timestamp: String::new(),
-            }),
-            _ => Err("Unsupported ServerMessage variant for broker".to_string()),
-        }
-    }
-}
-
 /// Internal enumeration for join a room
 /// Used for an existing user to move into another room or a new user joining a room
 enum JoinRoomType {
