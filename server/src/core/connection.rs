@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod connection_tests;
 
-use crate::auth::client;
+use crate::auth::users;
 use crate::core::broker::{BrokerClient, BrokerEvent, BrokerToClientMsg};
 use chrono::Local;
 use common::ws_messages::{AuthenticateUser, ClientMessage, ServerMessage};
@@ -18,7 +18,7 @@ fn parse_authenticate(raw: &str) -> Result<AuthenticateUser, ServerMessage> {
         Ok(ClientMessage::Authenticate(auth)) => Ok(auth),
         _ => Err(ServerMessage::AuthResult {
             success: false,
-            error: Some("First message must be authenticate".to_string()),
+            msg: Some("First message must be authenticate".to_string()),
         }),
     }
 }
@@ -156,17 +156,26 @@ where
     let str_id = auth_msg.username.clone();
     let password = auth_msg.password.clone();
 
-    if !client::authenticate(&str_id, &password) {
-        let response = ServerMessage::AuthResult {
-            success: false,
-            error: Some(
-                "Authentication failed. Either the user exists, either wrong password.".to_string(),
-            ),
-        };
-        let json = serde_json::to_string(&response).unwrap();
-        let _ = sink.send(Message::Text(json.into())).await;
-        warn!("Bad authentication for {str_id}, disconnecting..");
-        return;
+    match users::authenticate(&str_id, &password) {
+        users::AuthResult::Registered => {
+            let response = ServerMessage::AuthResult {
+                success: true,
+                msg: Some("New account created".to_string()),
+            };
+            let json = serde_json::to_string(&response).unwrap();
+            let _ = sink.send(Message::Text(json.into())).await;
+        }
+        users::AuthResult::Authenticated => {}
+        users::AuthResult::Denied => {
+            let response = ServerMessage::AuthResult {
+                success: false,
+                msg: Some("Wrong password".to_string()),
+            };
+            let json = serde_json::to_string(&response).unwrap();
+            let _ = sink.send(Message::Text(json.into())).await;
+            warn!("Bad authentication for {str_id}, disconnecting..");
+            return;
+        }
     }
 
     let (broker_tx, broker_rx) = mpsc::unbounded_channel::<BrokerToClientMsg>();

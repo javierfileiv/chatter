@@ -50,10 +50,7 @@ pub enum ClientMessage {
 pub enum ServerMessage {
     // Authentication response
     #[serde(rename = "auth_result")]
-    AuthResult {
-        success: bool,
-        error: Option<String>,
-    },
+    AuthResult { success: bool, msg: Option<String> },
     // Broadcast response
     #[serde(rename = "chat")]
     Chat {

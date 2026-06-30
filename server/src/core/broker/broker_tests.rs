@@ -461,7 +461,7 @@ mod tryfrom_tests {
             result,
             ServerMessage::AuthResult {
                 success: true,
-                error: None,
+                msg: None,
             }
         ));
     }
@@ -472,7 +472,7 @@ mod tryfrom_tests {
         let result = ServerMessage::try_from(msg).unwrap();
         assert!(matches!(
             result,
-            ServerMessage::AuthResult { success: false, error: Some(ref e) } if e == "Connection failed"
+            ServerMessage::AuthResult { success: false, msg: Some(ref e) } if e == "Connection failed"
         ));
     }
 
@@ -549,7 +549,7 @@ mod tryfrom_tests {
     fn tryfrom_server_to_broker_auth_result() {
         let msg = ServerMessage::AuthResult {
             success: true,
-            error: None,
+            msg: None,
         };
         let result = BrokerToClientMsg::try_from(msg);
         assert!(result.is_ok());

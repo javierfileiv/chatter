@@ -70,7 +70,11 @@ async fn handle_connection(ctx: Arc<Context>, ws: WebSocketStream<TcpStream>, cb
     //wait for response
     match timeout(Duration::from_secs(5), reader.next()).await {
         Ok(Some(Ok(Message::Text(text)))) => match serde_json::from_str::<ServerMessage>(&text) {
-            Ok(ServerMessage::AuthResult { success: true, .. }) => {}
+            Ok(ServerMessage::AuthResult { success: true, msg }) => {
+                if let Some(msg) = msg {
+                    ui::dialogs::set_notification(&cb_sink, &msg);
+                }
+            }
             _ => {
                 let msg = "Authentication failed";
                 error!("{}", msg);

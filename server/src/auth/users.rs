@@ -11,7 +11,16 @@ use std::sync::Mutex;
 static USERS: LazyLock<Mutex<HashMap<String, String>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
-pub fn authenticate(user: &str, password: &str) -> bool {
+pub enum AuthResult {
+    /// New user was auto-registered
+    Registered,
+    /// Existing user, password matches
+    Authenticated,
+    /// Wrong password
+    Denied,
+}
+
+pub fn authenticate(user: &str, password: &str) -> AuthResult {
     let mut map = USERS.lock().unwrap();
     // If user exists in map, verify password... otherwise register it.
     if let Some(stored) = map.get(user) {
@@ -22,8 +31,12 @@ pub fn authenticate(user: &str, password: &str) -> bool {
                 .is_ok()
             {
                 info!("Authenticated {user}");
-                return true;
+                AuthResult::Authenticated
+            } else {
+                AuthResult::Denied
             }
+        } else {
+            AuthResult::Denied
         }
     } else {
         info!("Auto-registering new user {user}");
@@ -32,14 +45,12 @@ pub fn authenticate(user: &str, password: &str) -> bool {
         if let Ok(password_hash) = argon2.hash_password(password.as_bytes(), &salt) {
             info!("Saving hash {} for {user}", password_hash);
             map.insert(user.to_string(), password_hash.to_string());
-            return true;
+            AuthResult::Registered
         } else {
             info!("Password for {user} couldn't be hashed");
-            return false;
+            AuthResult::Denied
         }
     }
-    info!("Authentication failed for {user}");
-    false
 }
 
 #[cfg(test)]
@@ -48,8 +59,14 @@ mod tests {
 
     #[test]
     fn test_auto_register_and_authenticate() {
-        assert!(authenticate("alice", "secret123")); // auto-register
-        assert!(authenticate("alice", "secret123")); // correct password
-        assert!(!authenticate("alice", "wrong")); // wrong password
+        assert!(matches!(
+            authenticate("alice", "secret123"),
+            AuthResult::Registered
+        ));
+        assert!(matches!(
+            authenticate("alice", "secret123"),
+            AuthResult::Authenticated
+        ));
+        assert!(matches!(authenticate("alice", "wrong"), AuthResult::Denied));
     }
 }

@@ -173,12 +173,12 @@ impl TryFrom<BrokerToClientMsg> for ServerMessage {
                 if status {
                     Ok(ServerMessage::AuthResult {
                         success: true,
-                        error: None,
+                        msg: None,
                     })
                 } else {
                     Ok(ServerMessage::AuthResult {
                         success: false,
-                        error: Some("Connection failed".to_string()),
+                        msg: Some("Connection failed".to_string()),
                     })
                 }
             }
@@ -220,7 +220,10 @@ impl TryFrom<ServerMessage> for BrokerToClientMsg {
 
     fn try_from(msg: ServerMessage) -> Result<Self, Self::Error> {
         match msg {
-            ServerMessage::AuthResult { success, error } => {
+            ServerMessage::AuthResult {
+                success,
+                msg: error,
+            } => {
                 let status = success && error.is_none();
                 Ok(BrokerToClientMsg::Response(BrokerRsp::Connect { status }))
             }
