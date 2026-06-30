@@ -41,7 +41,6 @@ chatter/
 ├── common/                     # Shared library crate
 │   ├── src/lib.rs              #   Re-exports errors and ws_messages
 │   ├── src/ws_messages.rs      #   Serde structs: AuthenticateUser, SendMessage, Logout
-│   ├── src/errors.rs           #   Unused error enum (to remove)
 │   └── Cargo.toml              #   edition = "2021"
 ├── server/                     # Server crate
 │   ├── src/main.rs             #   Tokio entrypoint, CLI args (port, log-dir)
