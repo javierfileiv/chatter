@@ -41,12 +41,12 @@ chatter/
 ├── common/                     # Shared library crate
 │   ├── src/lib.rs              #   Re-exports errors and ws_messages
 │   ├── src/ws_messages.rs      #   Serde structs: AuthenticateUser, SendMessage, Logout
-│   ├── src/errors.rs           #   Unused error enum
+│   ├── src/errors.rs           #   Unused error enum (to remove)
 │   └── Cargo.toml              #   edition = "2021"
 ├── server/                     # Server crate
 │   ├── src/main.rs             #   Tokio entrypoint, CLI args (port, log-dir)
 │   ├── src/auth.rs             #   Auth module root
-│   ├── src/auth/client.rs      #   authenticate() stub — always returns true
+│   ├── src/auth/users.rs       #   Argon2 password hashing + auto-register
 │   ├── src/core.rs             #   Core module root
 │   ├── src/core/server.rs      #   Accept loop, spawns per-connection tasks
 │   ├── src/core/broker.rs      #   Central event loop: rooms, clients, routing
@@ -86,7 +86,7 @@ client ──WebSocket──▶ server::core::server (accept loop)
                           ▼
                     server::core::broker (central event loop)
                           │  manages rooms & clients
-                          │  routes Connect / Broadcast / JoinRoom events
+                          │  routes AddUserToBroker / Broadcast / JoinRoom events
                           ▼
                     BrokerToClientMsg → back to connection → WebSocket → client
 ```
@@ -105,7 +105,7 @@ No separate registration step is needed. The map is lost when the server restart
 | Crate | Role | Key Dependencies |
 |-------|------|-----------------|
 | `common` | Shared message types & errors | `serde`, `serde_json`, `anyhow`, `tokio-util` |
-| `server` | WebSocket server + broker | `tokio` (full), `tokio-tungstenite`, `futures-util`, `flexi_logger`, `tracing` |
+| `server` | WebSocket server + broker | `tokio` (full), `tokio-tungstenite`, `futures-util`, `flexi_logger`, `argon2`, `rand` |
 | `client` | Terminal TUI client | `cursive`, `clap`, `chrono`, `tokio`, `tokio-tungstenite`, `futures-util`, `flexi_logger`, `cursive-flexi-logger-view` |
 
 ## Getting Started
@@ -224,8 +224,7 @@ Three GitHub Actions workflows run on push/PR to main/master:
 
 ### Known Gaps
 
-- **Password storage** — credentials are stored in plain text (in-memory HashMap); no argon2 hashing yet.
-- **Persistence** — user database is lost when the server restarts.
+- **Persistence** — user database is stored in memory and lost when the server restarts.
 
 ## License
 
