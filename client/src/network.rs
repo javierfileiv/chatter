@@ -72,7 +72,7 @@ async fn handle_connection(ctx: Arc<Context>, ws: WebSocketStream<TcpStream>, cb
         Ok(Some(Ok(Message::Text(text)))) => match serde_json::from_str::<ServerMessage>(&text) {
             Ok(ServerMessage::AuthResult { success: true, msg }) => {
                 if let Some(msg) = msg {
-                    ui::dialogs::set_notification(&cb_sink, &msg);
+                    ui::dialogs::display_message(&cb_sink, msg);
                 }
             }
             _ => {

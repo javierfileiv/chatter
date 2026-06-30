@@ -156,26 +156,22 @@ where
     let str_id = auth_msg.username.clone();
     let password = auth_msg.password.clone();
 
-    match users::authenticate(&str_id, &password) {
-        users::AuthResult::Registered => {
-            let response = ServerMessage::AuthResult {
-                success: true,
-                msg: Some("New account created".to_string()),
-            };
-            let json = serde_json::to_string(&response).unwrap();
-            let _ = sink.send(Message::Text(json.into())).await;
-        }
-        users::AuthResult::Authenticated => {}
-        users::AuthResult::Denied => {
-            let response = ServerMessage::AuthResult {
-                success: false,
-                msg: Some("Wrong password".to_string()),
-            };
-            let json = serde_json::to_string(&response).unwrap();
-            let _ = sink.send(Message::Text(json.into())).await;
-            warn!("Bad authentication for {str_id}, disconnecting..");
-            return;
-        }
+    let (success, msg) = match users::authenticate(&str_id, &password) {
+        users::AuthResult::Registered => (true, Some("New account created".to_string())),
+        users::AuthResult::Authenticated => (true, None),
+        users::AuthResult::Denied => (false, Some("Wrong password".to_string())),
+    };
+    let response = ServerMessage::AuthResult { success, msg };
+
+    let json = serde_json::to_string(&response).unwrap();
+    if sink.send(Message::Text(json.into())).await.is_err() {
+        error!("Failed to send auth response to {addr}");
+        return;
+    }
+
+    if !success {
+        warn!("Bad authentication for {str_id}, disconnecting..");
+        return;
     }
 
     let (broker_tx, broker_rx) = mpsc::unbounded_channel::<BrokerToClientMsg>();
@@ -188,9 +184,9 @@ where
     };
 
     let timestamp = Local::now().format("%d/%m/%Y %H:%M:%S").to_string();
-    info!("Sending connect for {} at {}", auth_msg.username, timestamp);
+    info!("Adding {} to broker at {}", auth_msg.username, timestamp);
 
-    let msg_to_broker = BrokerEvent::Connect {
+    let msg_to_broker = BrokerEvent::AddUserToBroker {
         client: broker_client,
         timestamp,
     };

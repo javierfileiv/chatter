@@ -26,9 +26,9 @@ async fn check_response(rx_from_client: &mut UnboundedReceiver<BrokerToClientMsg
         tokio::time::timeout(std::time::Duration::from_millis(100), rx_from_client.recv()).await;
 
     match response_from_broker {
-        Ok(Some(BrokerToClientMsg::Response(BrokerRsp::Connect { status }))) => {
+        Ok(Some(BrokerToClientMsg::Response(BrokerRsp::AddedToBroker { status }))) => {
             assert!(status, "Broker has not connected client");
-            println!("Connect Treated");
+            println!("AddedToBroker Treated");
         }
         Ok(Some(BrokerToClientMsg::Response(BrokerRsp::JoinRoom { status, created }))) => {
             assert!(status, "Broker has not joined a room");
@@ -67,14 +67,14 @@ async fn test_broker_connection_success() {
     let tx_broker = init();
     let addr: SocketAddr = "127.0.0.1:8080".parse().unwrap();
     let (client, mut rx) = fake_client(addr, "Alice", "games");
-    let result = tx_broker.send(BrokerEvent::Connect {
+    let result = tx_broker.send(BrokerEvent::AddUserToBroker {
         client,
         timestamp: test_timestamp(),
     });
 
     assert!(
         result.is_ok(),
-        "The Broker should have received the Connected event"
+        "The Broker should have received the AddedToBroker event"
     );
     check_response(&mut rx).await;
 }
@@ -86,7 +86,7 @@ async fn test_broker_broadcast_success() {
     let (client, mut rx) = fake_client(addr, "Alice", "games");
 
     tx_broker
-        .send(BrokerEvent::Connect {
+        .send(BrokerEvent::AddUserToBroker {
             client,
             timestamp: test_timestamp(),
         })
@@ -129,7 +129,7 @@ async fn broadcast_to_multiple_clients_in_same_room() {
     let (bob, mut rx_bob) = fake_client(addr_bob, "Bob", "games");
 
     tx_broker
-        .send(BrokerEvent::Connect {
+        .send(BrokerEvent::AddUserToBroker {
             client: alice,
             timestamp: test_timestamp(),
         })
@@ -137,7 +137,7 @@ async fn broadcast_to_multiple_clients_in_same_room() {
     check_response(&mut rx_alice).await;
 
     tx_broker
-        .send(BrokerEvent::Connect {
+        .send(BrokerEvent::AddUserToBroker {
             client: bob,
             timestamp: test_timestamp(),
         })
@@ -187,7 +187,7 @@ async fn broadcast_only_sender_in_room() {
     let (client, mut rx) = fake_client(addr, "Solo", "empty");
 
     tx_broker
-        .send(BrokerEvent::Connect {
+        .send(BrokerEvent::AddUserToBroker {
             client,
             timestamp: test_timestamp(),
         })
@@ -228,7 +228,7 @@ async fn broadcast_does_not_cross_rooms() {
     let (bob, mut rx_bob) = fake_client(addr_bob, "Bob", "room_b");
 
     tx_broker
-        .send(BrokerEvent::Connect {
+        .send(BrokerEvent::AddUserToBroker {
             client: alice,
             timestamp: test_timestamp(),
         })
@@ -236,7 +236,7 @@ async fn broadcast_does_not_cross_rooms() {
     check_response(&mut rx_alice).await;
 
     tx_broker
-        .send(BrokerEvent::Connect {
+        .send(BrokerEvent::AddUserToBroker {
             client: bob,
             timestamp: test_timestamp(),
         })
@@ -276,7 +276,7 @@ async fn join_room_first_connect_creates_room_success() {
     let (client, mut rx) = fake_client(addr, "Alice", "games");
 
     tx_broker
-        .send(BrokerEvent::Connect {
+        .send(BrokerEvent::AddUserToBroker {
             client,
             timestamp: test_timestamp(),
         })
@@ -301,7 +301,7 @@ async fn join_room_first_connect_duplicate_client_fails() {
     let (client2, mut rx2) = fake_client(addr, "Alice", "other");
 
     tx_broker
-        .send(BrokerEvent::Connect {
+        .send(BrokerEvent::AddUserToBroker {
             client: client1,
             timestamp: test_timestamp(),
         })
@@ -309,7 +309,7 @@ async fn join_room_first_connect_duplicate_client_fails() {
     check_response(&mut rx1).await;
 
     tx_broker
-        .send(BrokerEvent::Connect {
+        .send(BrokerEvent::AddUserToBroker {
             client: client2,
             timestamp: test_timestamp(),
         })
@@ -318,7 +318,7 @@ async fn join_room_first_connect_duplicate_client_fails() {
     let resp = tokio::time::timeout(std::time::Duration::from_millis(100), rx2.recv()).await;
 
     match resp {
-        Ok(Some(BrokerToClientMsg::Response(BrokerRsp::Connect { status }))) => {
+        Ok(Some(BrokerToClientMsg::Response(BrokerRsp::AddedToBroker { status }))) => {
             assert!(!status, "Duplicate FirstConnect should fail");
         }
         other => panic!("Unexpected response on rx2: {:?}", other),
@@ -332,7 +332,7 @@ async fn join_room_room_move_to_new_room_success() {
     let (client, mut rx) = fake_client(addr, "Alice", "games");
 
     tx_broker
-        .send(BrokerEvent::Connect {
+        .send(BrokerEvent::AddUserToBroker {
             client,
             timestamp: test_timestamp(),
         })
@@ -359,7 +359,7 @@ async fn join_room_room_move_to_existing_room_success() {
     let (client_b, mut rx_b) = fake_client(addr_b, "Bob", "lounge");
 
     tx_broker
-        .send(BrokerEvent::Connect {
+        .send(BrokerEvent::AddUserToBroker {
             client: client_a,
             timestamp: test_timestamp(),
         })
@@ -367,7 +367,7 @@ async fn join_room_room_move_to_existing_room_success() {
     check_response(&mut rx_a).await;
 
     tx_broker
-        .send(BrokerEvent::Connect {
+        .send(BrokerEvent::AddUserToBroker {
             client: client_b,
             timestamp: test_timestamp(),
         })
@@ -391,7 +391,7 @@ async fn join_room_room_move_unknown_addr_fails() {
     let (client, mut rx) = fake_client(addr, "Alice", "games");
 
     tx_broker
-        .send(BrokerEvent::Connect {
+        .send(BrokerEvent::AddUserToBroker {
             client,
             timestamp: test_timestamp(),
         })
@@ -419,7 +419,7 @@ async fn join_room_room_move_same_room_fails() {
     let (client, mut rx) = fake_client(addr, "Alice", "games");
 
     tx_broker
-        .send(BrokerEvent::Connect {
+        .send(BrokerEvent::AddUserToBroker {
             client,
             timestamp: test_timestamp(),
         })
@@ -452,27 +452,24 @@ mod tryfrom_tests {
     use common::ws_messages::ServerMessage;
 
     #[test]
-    fn tryfrom_broker_connect_success() {
-        let msg = BrokerToClientMsg::Response(BrokerRsp::Connect { status: true });
+    fn tryfrom_broker_connected_success() {
+        let msg = BrokerToClientMsg::Response(BrokerRsp::AddedToBroker { status: true });
         let result = ServerMessage::try_from(msg);
         assert!(result.is_ok());
         let result = result.unwrap();
         assert!(matches!(
             result,
-            ServerMessage::AuthResult {
-                success: true,
-                msg: None,
-            }
+            ServerMessage::Notification { ref value, .. } if value == "Connected"
         ));
     }
 
     #[test]
-    fn tryfrom_broker_connect_failure() {
-        let msg = BrokerToClientMsg::Response(BrokerRsp::Connect { status: false });
+    fn tryfrom_broker_connected_failure() {
+        let msg = BrokerToClientMsg::Response(BrokerRsp::AddedToBroker { status: false });
         let result = ServerMessage::try_from(msg).unwrap();
         assert!(matches!(
             result,
-            ServerMessage::AuthResult { success: false, msg: Some(ref e) } if e == "Connection failed"
+            ServerMessage::Error { ref value } if value == "Connection failed"
         ));
     }
 
@@ -542,21 +539,6 @@ mod tryfrom_tests {
             result,
             ServerMessage::Notification { ref value, ref timestamp }
             if value == "user left" && timestamp == "17/06/2026 18:30:00"
-        ));
-    }
-
-    #[test]
-    fn tryfrom_server_to_broker_auth_result() {
-        let msg = ServerMessage::AuthResult {
-            success: true,
-            msg: None,
-        };
-        let result = BrokerToClientMsg::try_from(msg);
-        assert!(result.is_ok());
-        let result = result.unwrap();
-        assert!(matches!(
-            result,
-            BrokerToClientMsg::Response(BrokerRsp::Connect { status: true })
         ));
     }
 
