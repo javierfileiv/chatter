@@ -1,0 +1,7 @@
+services:
+  server:
+    build: .
+    ports:
+      - "1234:1234"
+    volumes:
+      - ./logs:/logs

@@ -67,6 +67,7 @@ chatter/
 ├── Cargo.toml                  # Workspace manifest (3 members)
 ├── Cargo.lock
 ├── Dockerfile                  # Multi-stage Docker build (server only)
+├── docker-compose.yml          # Docker Compose for server
 ├── .dockerignore               # Files excluded from Docker context
 ├── .pre-commit-config.yaml     # fmt + clippy hooks
 ├── tools/requirements.txt      # pre-commit (Python)
@@ -142,6 +143,12 @@ Run the server container (port 1234 exposed):
 
 ```bash
 docker run -p 1234:1234 chatter-server
+```
+
+Or with Docker Compose:
+
+```bash
+docker compose up (add --build if code has been modified, otherwise cached image will be used)
 ```
 
 ### Run the Client
