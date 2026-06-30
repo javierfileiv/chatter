@@ -61,6 +61,9 @@ pub enum ServerMessage {
     // Server communicates something
     #[serde(rename = "notification")]
     Notification { value: String, timestamp: String },
+    // Server communicates something
+    #[serde(rename = "user_logout")]
+    UserLogoutNtf { value: String, timestamp: String },
     // Some error in the server
     #[serde(rename = "error")]
     Error { value: String },

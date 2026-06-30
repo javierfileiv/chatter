@@ -315,10 +315,10 @@ async def test_disconnect_notification_multiple_clients(chatter_server):
     # user0 logs out
     await clients[0].send(json.dumps({"type": "logout", "message": "bye"}))
 
-    # users 1-3 should all receive a notification
+    # users 1-3 should all receive a logout notification
     for ws in clients[1:]:
         msg = json.loads(await asyncio.wait_for(ws.recv(), timeout=5))
-        assert msg["type"] == "notification"
+        assert msg["type"] == "user_logout"
         assert "user0" in msg["value"]
         assert "left" in msg["value"].lower()
 
@@ -359,10 +359,10 @@ async def test_disconnect_notification_on_close_without_logout(chatter_server):
     # user0 closes the connection without sending logout
     await clients[0].close()
 
-    # users 1-2 should receive a notification
+    # users 1-2 should receive a logout notification
     for ws in clients[1:]:
         msg = json.loads(await asyncio.wait_for(ws.recv(), timeout=5))
-        assert msg["type"] == "notification"
+        assert msg["type"] == "user_logout"
         assert "user0" in msg["value"]
         assert "left" in msg["value"].lower()
 

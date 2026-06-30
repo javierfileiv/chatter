@@ -53,11 +53,14 @@ impl BrokerClient {
             );
         }
     }
-    pub fn send_notification(&self, text: &str, timestamp: &str) {
-        if let Err(e) = self.broker_to_client.send(BrokerToClientMsg::Notification {
-            text: text.to_owned(),
-            timestamp: timestamp.to_owned(),
-        }) {
+    pub fn send_logout_ntf(&self, text: &str, timestamp: &str) {
+        if let Err(e) = self
+            .broker_to_client
+            .send(BrokerToClientMsg::UserLogoutNtf {
+                text: text.to_owned(),
+                timestamp: timestamp.to_owned(),
+            })
+        {
             error!(
                 "Failed to send notification to client: {} (addr {}): {}",
                 self.str_id, self.addr, e
@@ -137,8 +140,10 @@ pub enum BrokerToClientMsg {
         /// Timestamp when the message was received
         timestamp: String,
     },
-    Notification {
+    UserLogoutNtf {
+        /// Notification message
         text: String,
+        /// Notification timestamp
         timestamp: String,
     },
 }
@@ -204,8 +209,8 @@ impl TryFrom<BrokerToClientMsg> for ServerMessage {
                 message: text,
                 timestamp,
             }),
-            BrokerToClientMsg::Notification { text, timestamp } => {
-                Ok(ServerMessage::Notification {
+            BrokerToClientMsg::UserLogoutNtf { text, timestamp } => {
+                Ok(ServerMessage::UserLogoutNtf {
                     value: text,
                     timestamp,
                 })
@@ -425,7 +430,7 @@ pub async fn run(mut rx_events: mpsc::UnboundedReceiver<BrokerEvent>) {
                     let notification = format!("{} has left the room", username);
                     for &room_addr in addr_list.iter() {
                         if let Some(room_client) = ctx.clients.get(&room_addr) {
-                            room_client.send_notification(&notification, &timestamp);
+                            room_client.send_logout_ntf(&notification, &timestamp);
                         }
                     }
 

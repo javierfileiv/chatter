@@ -50,8 +50,8 @@ async fn check_response(rx_from_client: &mut UnboundedReceiver<BrokerToClientMsg
                 sender_name, sender, timestamp, text
             );
         }
-        Ok(Some(BrokerToClientMsg::Notification { text, timestamp })) => {
-            println!("Received notification at {}: {}", timestamp, text);
+        Ok(Some(BrokerToClientMsg::UserLogoutNtf { text, timestamp })) => {
+            println!("Received logout notification at {}: {}", timestamp, text);
         }
         Ok(None) => {
             panic!("Closed mpsc.");
@@ -530,14 +530,14 @@ mod tryfrom_tests {
 
     #[test]
     fn tryfrom_broker_notification() {
-        let msg = BrokerToClientMsg::Notification {
+        let msg = BrokerToClientMsg::UserLogoutNtf {
             text: "user left".to_string(),
             timestamp: "17/06/2026 18:30:00".to_string(),
         };
         let result = ServerMessage::try_from(msg).unwrap();
         assert!(matches!(
             result,
-            ServerMessage::Notification { ref value, ref timestamp }
+            ServerMessage::UserLogoutNtf { ref value, ref timestamp }
             if value == "user left" && timestamp == "17/06/2026 18:30:00"
         ));
     }

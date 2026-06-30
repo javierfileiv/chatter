@@ -289,7 +289,7 @@ async fn ws_half_writer_integration_user_left_notification() {
 
     let writer = ws_half_writer(sink, rx);
     let sender = async {
-        tx.send(BrokerToClientMsg::Notification {
+        tx.send(BrokerToClientMsg::UserLogoutNtf {
             text: "alice has left the room".to_string(),
             timestamp: "17/06/2026 18:30:00".to_string(),
         })
@@ -302,7 +302,7 @@ async fn ws_half_writer_integration_user_left_notification() {
         match msg {
             Message::Text(text) => {
                 let parsed: serde_json::Value = serde_json::from_str(&text).unwrap();
-                assert_eq!(parsed["type"], "notification");
+                assert_eq!(parsed["type"], "user_logout");
                 assert_eq!(parsed["value"], "alice has left the room");
                 assert_eq!(parsed["timestamp"], "17/06/2026 18:30:00");
             }
