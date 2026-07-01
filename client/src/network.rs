@@ -70,7 +70,11 @@ async fn handle_connection(ctx: Arc<Context>, ws: WebSocketStream<TcpStream>, cb
     //wait for response
     match timeout(Duration::from_secs(5), reader.next()).await {
         Ok(Some(Ok(Message::Text(text)))) => match serde_json::from_str::<ServerMessage>(&text) {
-            Ok(ServerMessage::AuthResult { success: true, .. }) => {}
+            Ok(ServerMessage::AuthResult { success: true, msg }) => {
+                if let Some(msg) = msg {
+                    ui::dialogs::display_message(&cb_sink, msg);
+                }
+            }
             _ => {
                 let msg = "Authentication failed";
                 error!("{}", msg);
@@ -170,6 +174,10 @@ fn handle_incoming_server_msg(cb_sink: &CbSink, ws_server_msg: String) {
             ServerMessage::Notification { value, timestamp } => {
                 let msg = format!("{}: {}", timestamp, value);
                 ui::dialogs::set_notification(cb_sink, &msg);
+            }
+            ServerMessage::UserLogoutNtf { value, timestamp } => {
+                let msg = format!("{}: {}", timestamp, value);
+                ui::dialogs::display_message(cb_sink, msg);
             }
             ServerMessage::Error { value } => {
                 let str = format!("Received Error ServerMessage: {}.", value);

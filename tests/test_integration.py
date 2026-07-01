@@ -25,6 +25,28 @@ async def test_connect_auth_success(chatter_server):
 
 
 @pytest.mark.asyncio
+async def test_existing_user_authenticate(chatter_server):
+    """Existing user (same credentials) receives AuthResult without a msg field."""
+    # First connection: register alice
+    async with websockets.connect(f"ws://127.0.0.1:{chatter_server}") as ws1:
+        await ws1.send(AUTH_MSG)
+        resp = json.loads(await asyncio.wait_for(ws1.recv(), timeout=5))
+        assert resp["type"] == "auth_result"
+        assert resp["success"] is True
+        # consume "Connected" notification
+        await asyncio.wait_for(ws1.recv(), timeout=5)
+
+    # Second connection: same credentials, alice should authenticate as existing user
+    async with websockets.connect(f"ws://127.0.0.1:{chatter_server}") as ws2:
+        await ws2.send(AUTH_MSG)
+        resp = json.loads(await asyncio.wait_for(ws2.recv(), timeout=5))
+        assert resp["type"] == "auth_result"
+        assert resp["success"] is True
+        # Existing user should have no msg (no "New account created")
+        assert resp.get("msg") is None
+
+
+@pytest.mark.asyncio
 async def test_send_message(chatter_server):
     """Send a broadcast message and verify no error."""
     async with websockets.connect(f"ws://127.0.0.1:{chatter_server}") as ws:
@@ -49,6 +71,7 @@ async def test_logout(chatter_server):
     async with websockets.connect(f"ws://127.0.0.1:{chatter_server}") as ws:
         await ws.send(AUTH_MSG)
         await asyncio.wait_for(ws.recv(), timeout=5)  # consume auth response
+        await asyncio.wait_for(ws.recv(), timeout=5)  # consume "Connected" notification
 
         await ws.send(
             json.dumps(
@@ -116,8 +139,11 @@ async def test_two_clients_broadcast(chatter_server):
             )
         )
 
-        # Bob should receive it
-        msg = json.loads(await asyncio.wait_for(ws2.recv(), timeout=5))
+        # Bob should receive it — might be preceded by a "Joined room" notification
+        for _ in range(2):
+            msg = json.loads(await asyncio.wait_for(ws2.recv(), timeout=5))
+            if msg["type"] == "chat":
+                break
         assert msg["type"] == "chat"
         assert msg["sender"] == "alice"
         assert msg["message"] == "hello bob"
@@ -145,6 +171,10 @@ async def test_five_clients_broadcast(chatter_server):
         )
 
     # Consume auth responses
+    for ws in clients:
+        await asyncio.wait_for(ws.recv(), timeout=5)
+
+    # Consume "Joined room" notifications
     for ws in clients:
         await asyncio.wait_for(ws.recv(), timeout=5)
 
@@ -219,6 +249,12 @@ async def test_messages_do_not_cross_rooms(chatter_server):
     for ws in room_b:
         await asyncio.wait_for(ws.recv(), timeout=5)
 
+    # Consume "Joined room" notifications
+    for ws in room_a:
+        await asyncio.wait_for(ws.recv(), timeout=5)
+    for ws in room_b:
+        await asyncio.wait_for(ws.recv(), timeout=5)
+
     # alice0 sends a message in room A
     await room_a[0].send(
         json.dumps(
@@ -272,13 +308,17 @@ async def test_disconnect_notification_multiple_clients(chatter_server):
     for ws in clients:
         await asyncio.wait_for(ws.recv(), timeout=5)
 
+    # Consume "Connected" notifications
+    for ws in clients:
+        await asyncio.wait_for(ws.recv(), timeout=5)
+
     # user0 logs out
     await clients[0].send(json.dumps({"type": "logout", "message": "bye"}))
 
-    # users 1-3 should all receive a notification
+    # users 1-3 should all receive a logout notification
     for ws in clients[1:]:
         msg = json.loads(await asyncio.wait_for(ws.recv(), timeout=5))
-        assert msg["type"] == "notification"
+        assert msg["type"] == "user_logout"
         assert "user0" in msg["value"]
         assert "left" in msg["value"].lower()
 
@@ -312,13 +352,17 @@ async def test_disconnect_notification_on_close_without_logout(chatter_server):
     for ws in clients:
         await asyncio.wait_for(ws.recv(), timeout=5)
 
+    # Consume "Connected" notifications
+    for ws in clients:
+        await asyncio.wait_for(ws.recv(), timeout=5)
+
     # user0 closes the connection without sending logout
     await clients[0].close()
 
-    # users 1-2 should receive a notification
+    # users 1-2 should receive a logout notification
     for ws in clients[1:]:
         msg = json.loads(await asyncio.wait_for(ws.recv(), timeout=5))
-        assert msg["type"] == "notification"
+        assert msg["type"] == "user_logout"
         assert "user0" in msg["value"]
         assert "left" in msg["value"].lower()
 

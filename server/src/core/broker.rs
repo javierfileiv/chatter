@@ -53,11 +53,14 @@ impl BrokerClient {
             );
         }
     }
-    pub fn send_notification(&self, text: &str, timestamp: &str) {
-        if let Err(e) = self.broker_to_client.send(BrokerToClientMsg::Notification {
-            text: text.to_owned(),
-            timestamp: timestamp.to_owned(),
-        }) {
+    pub fn send_logout_ntf(&self, text: &str, timestamp: &str) {
+        if let Err(e) = self
+            .broker_to_client
+            .send(BrokerToClientMsg::UserLogoutNtf {
+                text: text.to_owned(),
+                timestamp: timestamp.to_owned(),
+            })
+        {
             error!(
                 "Failed to send notification to client: {} (addr {}): {}",
                 self.str_id, self.addr, e
@@ -69,8 +72,8 @@ impl BrokerClient {
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub enum BrokerEvent {
-    /// Event for when a client connects
-    Connect {
+    /// Event when user is added to broker list
+    AddUserToBroker {
         client: BrokerClient,
         /// Timestamp when the message was received
         timestamp: String,
@@ -106,8 +109,8 @@ pub enum BrokerEvent {
 #[allow(dead_code)]
 #[derive(Debug, Clone, Copy)]
 pub enum BrokerRsp {
-    /// Response for when a client connects
-    Connect {
+    /// Response for successful connection to broker
+    AddedToBroker {
         /// Final status
         status: bool,
     },
@@ -137,8 +140,10 @@ pub enum BrokerToClientMsg {
         /// Timestamp when the message was received
         timestamp: String,
     },
-    Notification {
+    UserLogoutNtf {
+        /// Notification message
         text: String,
+        /// Notification timestamp
         timestamp: String,
     },
 }
@@ -169,16 +174,15 @@ impl TryFrom<BrokerToClientMsg> for ServerMessage {
     fn try_from(msg: BrokerToClientMsg) -> Result<Self, String> {
         let timestamp = Local::now().format("%d/%m/%Y %H:%M:%S").to_string();
         match msg {
-            BrokerToClientMsg::Response(BrokerRsp::Connect { status }) => {
+            BrokerToClientMsg::Response(BrokerRsp::AddedToBroker { status }) => {
                 if status {
-                    Ok(ServerMessage::AuthResult {
-                        success: true,
-                        error: None,
+                    Ok(ServerMessage::Notification {
+                        value: "Connected".to_string(),
+                        timestamp,
                     })
                 } else {
-                    Ok(ServerMessage::AuthResult {
-                        success: false,
-                        error: Some("Connection failed".to_string()),
+                    Ok(ServerMessage::Error {
+                        value: "Connection failed".to_string(),
                     })
                 }
             }
@@ -205,45 +209,12 @@ impl TryFrom<BrokerToClientMsg> for ServerMessage {
                 message: text,
                 timestamp,
             }),
-            BrokerToClientMsg::Notification { text, timestamp } => {
-                Ok(ServerMessage::Notification {
+            BrokerToClientMsg::UserLogoutNtf { text, timestamp } => {
+                Ok(ServerMessage::UserLogoutNtf {
                     value: text,
                     timestamp,
                 })
             }
-        }
-    }
-}
-
-impl TryFrom<ServerMessage> for BrokerToClientMsg {
-    type Error = String;
-
-    fn try_from(msg: ServerMessage) -> Result<Self, Self::Error> {
-        match msg {
-            ServerMessage::AuthResult { success, error } => {
-                let status = success && error.is_none();
-                Ok(BrokerToClientMsg::Response(BrokerRsp::Connect { status }))
-            }
-            ServerMessage::Chat {
-                sender,
-                message,
-                timestamp,
-            } => Ok(BrokerToClientMsg::ChatMessage {
-                sender: SocketAddr::from(([0, 0, 0, 0], 0)),
-                sender_name: sender,
-                text: message,
-                timestamp,
-            }),
-            ServerMessage::Notification { value, timestamp } => {
-                Ok(BrokerToClientMsg::Notification {
-                    text: value,
-                    timestamp,
-                })
-            }
-            ServerMessage::Error { value } => Ok(BrokerToClientMsg::Notification {
-                text: format!("Error: {}", value),
-                timestamp: String::new(),
-            }),
         }
     }
 }
@@ -354,10 +325,10 @@ fn join_room(ctx: &mut Broker, joining_client: JoinRoomType, room_name: String) 
     (true, room_created)
 }
 
-/// Register a client in the broker internal list
-fn register_client(ctx: &mut Broker, client: BrokerClient) -> bool {
+/// Add a client in the broker internal list
+fn add_user_to_broker(ctx: &mut Broker, client: BrokerClient) -> bool {
     info!(
-        "Registering client: {} (addr:{}) to room: {}",
+        "Adding client: {} (addr:{}) to room: {}",
         client.str_id, client.addr, client.room_name
     );
     let user_name = client.str_id.clone();
@@ -376,20 +347,23 @@ pub async fn run(mut rx_events: mpsc::UnboundedReceiver<BrokerEvent>) {
 
     while let Some(event) = rx_events.recv().await {
         match event {
-            BrokerEvent::Connect { client, timestamp } => {
+            BrokerEvent::AddUserToBroker {
+                client: user,
+                timestamp,
+            } => {
                 info!(
-                    "Broker: Registering client {} ({}) at {}",
-                    client.str_id, client.addr, timestamp
+                    "Broker: Adding user {} ({}) to broker at {}",
+                    user.str_id, user.addr, timestamp
                 );
 
-                let rsp_channel = client.broker_to_client.clone();
-                let status = register_client(&mut ctx, client);
+                let rsp_channel = user.broker_to_client.clone();
+                let status = add_user_to_broker(&mut ctx, user);
                 if let Err(e) =
-                    rsp_channel.send(BrokerToClientMsg::new_response(BrokerRsp::Connect {
+                    rsp_channel.send(BrokerToClientMsg::new_response(BrokerRsp::AddedToBroker {
                         status,
                     }))
                 {
-                    error!("Failed to send connect reply to client: {}", e);
+                    error!("Failed to send AddedToBroker reply to client: {}", e);
                 }
             }
             BrokerEvent::Broadcast {
@@ -456,7 +430,7 @@ pub async fn run(mut rx_events: mpsc::UnboundedReceiver<BrokerEvent>) {
                     let notification = format!("{} has left the room", username);
                     for &room_addr in addr_list.iter() {
                         if let Some(room_client) = ctx.clients.get(&room_addr) {
-                            room_client.send_notification(&notification, &timestamp);
+                            room_client.send_logout_ntf(&notification, &timestamp);
                         }
                     }
 
