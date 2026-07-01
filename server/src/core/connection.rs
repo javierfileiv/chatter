@@ -108,13 +108,7 @@ where
     S: Sink<Message> + Unpin,
 {
     while let Some(broker_msg) = broker_rx.recv().await {
-        let server_msg = match ServerMessage::try_from(broker_msg) {
-            Ok(msg) => msg,
-            Err(e) => {
-                error!("Failed to convert BrokerToClientMsg: {}", e);
-                continue;
-            }
-        };
+        let server_msg = ServerMessage::from(broker_msg);
 
         let json = match serde_json::to_string(&server_msg) {
             Ok(j) => j,

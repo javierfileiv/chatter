@@ -445,18 +445,16 @@ async fn join_room_room_move_same_room_fails() {
     }
 }
 
-// TryFrom conversion tests
+// From conversion tests
 
-mod tryfrom_tests {
+mod from_tests {
     use super::*;
     use common::ws_messages::ServerMessage;
 
     #[test]
-    fn tryfrom_broker_connected_success() {
+    fn from_broker_connected_success() {
         let msg = BrokerToClientMsg::Response(BrokerRsp::AddedToBroker { status: true });
-        let result = ServerMessage::try_from(msg);
-        assert!(result.is_ok());
-        let result = result.unwrap();
+        let result = ServerMessage::from(msg);
         assert!(matches!(
             result,
             ServerMessage::Notification { ref value, .. } if value == "Connected"
@@ -464,9 +462,9 @@ mod tryfrom_tests {
     }
 
     #[test]
-    fn tryfrom_broker_connected_failure() {
+    fn from_broker_connected_failure() {
         let msg = BrokerToClientMsg::Response(BrokerRsp::AddedToBroker { status: false });
-        let result = ServerMessage::try_from(msg).unwrap();
+        let result = ServerMessage::from(msg);
         assert!(matches!(
             result,
             ServerMessage::Error { ref value } if value == "Connection failed"
@@ -474,12 +472,12 @@ mod tryfrom_tests {
     }
 
     #[test]
-    fn tryfrom_broker_joinroom_success_created() {
+    fn from_broker_joinroom_success_created() {
         let msg = BrokerToClientMsg::Response(BrokerRsp::JoinRoom {
             status: true,
             created: true,
         });
-        let result = ServerMessage::try_from(msg).unwrap();
+        let result = ServerMessage::from(msg);
         assert!(matches!(
             result,
             ServerMessage::Notification { ref value, .. } if value == "Room created"
@@ -487,12 +485,12 @@ mod tryfrom_tests {
     }
 
     #[test]
-    fn tryfrom_broker_joinroom_success_joined() {
+    fn from_broker_joinroom_success_joined() {
         let msg = BrokerToClientMsg::Response(BrokerRsp::JoinRoom {
             status: true,
             created: false,
         });
-        let result = ServerMessage::try_from(msg).unwrap();
+        let result = ServerMessage::from(msg);
         assert!(matches!(
             result,
             ServerMessage::Notification { ref value, .. } if value == "Room joined"
@@ -500,12 +498,12 @@ mod tryfrom_tests {
     }
 
     #[test]
-    fn tryfrom_broker_joinroom_failure() {
+    fn from_broker_joinroom_failure() {
         let msg = BrokerToClientMsg::Response(BrokerRsp::JoinRoom {
             status: false,
             created: false,
         });
-        let result = ServerMessage::try_from(msg).unwrap();
+        let result = ServerMessage::from(msg);
         assert!(matches!(
             result,
             ServerMessage::Error { ref value } if value == "Join room failed"
@@ -513,14 +511,14 @@ mod tryfrom_tests {
     }
 
     #[test]
-    fn tryfrom_broker_chat_message() {
+    fn from_broker_chat_message() {
         let msg = BrokerToClientMsg::ChatMessage {
             sender: "127.0.0.1:8080".parse().unwrap(),
             sender_name: "alice".to_string(),
             text: "hello".to_string(),
             timestamp: "17/06/2026 18:30:00".to_string(),
         };
-        let result = ServerMessage::try_from(msg).unwrap();
+        let result = ServerMessage::from(msg);
         assert!(matches!(
             result,
             ServerMessage::Chat { ref sender, ref message, ref timestamp }
@@ -529,12 +527,12 @@ mod tryfrom_tests {
     }
 
     #[test]
-    fn tryfrom_broker_notification() {
+    fn from_broker_notification() {
         let msg = BrokerToClientMsg::UserLogoutNtf {
             text: "user left".to_string(),
             timestamp: "17/06/2026 18:30:00".to_string(),
         };
-        let result = ServerMessage::try_from(msg).unwrap();
+        let result = ServerMessage::from(msg);
         assert!(matches!(
             result,
             ServerMessage::UserLogoutNtf { ref value, ref timestamp }

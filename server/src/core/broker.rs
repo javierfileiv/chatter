@@ -168,35 +168,33 @@ impl BrokerToClientMsg {
     }
 }
 
-impl TryFrom<BrokerToClientMsg> for ServerMessage {
-    type Error = String;
-
-    fn try_from(msg: BrokerToClientMsg) -> Result<Self, String> {
+impl From<BrokerToClientMsg> for ServerMessage {
+    fn from(msg: BrokerToClientMsg) -> Self {
         let timestamp = Local::now().format("%d/%m/%Y %H:%M:%S").to_string();
         match msg {
             BrokerToClientMsg::Response(BrokerRsp::AddedToBroker { status }) => {
                 if status {
-                    Ok(ServerMessage::Notification {
+                    ServerMessage::Notification {
                         value: "Connected".to_string(),
                         timestamp,
-                    })
+                    }
                 } else {
-                    Ok(ServerMessage::Error {
+                    ServerMessage::Error {
                         value: "Connection failed".to_string(),
-                    })
+                    }
                 }
             }
             BrokerToClientMsg::Response(BrokerRsp::JoinRoom { status, created }) => {
                 if status {
                     let action = if created { "created" } else { "joined" };
-                    Ok(ServerMessage::Notification {
+                    ServerMessage::Notification {
                         value: format!("Room {}", action),
                         timestamp,
-                    })
+                    }
                 } else {
-                    Ok(ServerMessage::Error {
+                    ServerMessage::Error {
                         value: "Join room failed".to_string(),
-                    })
+                    }
                 }
             }
             BrokerToClientMsg::ChatMessage {
@@ -204,17 +202,15 @@ impl TryFrom<BrokerToClientMsg> for ServerMessage {
                 text,
                 timestamp,
                 ..
-            } => Ok(ServerMessage::Chat {
+            } => ServerMessage::Chat {
                 sender: sender_name,
                 message: text,
                 timestamp,
-            }),
-            BrokerToClientMsg::UserLogoutNtf { text, timestamp } => {
-                Ok(ServerMessage::UserLogoutNtf {
-                    value: text,
-                    timestamp,
-                })
-            }
+            },
+            BrokerToClientMsg::UserLogoutNtf { text, timestamp } => ServerMessage::UserLogoutNtf {
+                value: text,
+                timestamp,
+            },
         }
     }
 }
