@@ -70,7 +70,9 @@ chatter/
 ├── .dockerignore               # Files excluded from Docker context
 ├── .pre-commit-config.yaml     # fmt + clippy hooks
 ├── tools/requirements.txt      # pre-commit (Python)
-└── AGENTS.md                   # Agent-specific development notes
+├── docs/
+│   └── messages.plantuml       # Message sequence diagram source
+│   └── messages.svg            # Rendered SVG diagram
 ```
 
 ## Architecture
@@ -89,6 +91,8 @@ client ──WebSocket──▶ server::core::server (accept loop)
                           ▼
                     BrokerToClientMsg → back to connection → WebSocket → client
 ```
+
+![Message sequence diagram](docs/messages.svg)
 
 ### Auto-registration
 
