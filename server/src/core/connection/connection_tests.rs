@@ -40,7 +40,7 @@ fn parse_authenticate_rejects_invalid_json() {
 fn parse_client_message_send_produces_broadcast() {
     let addr = "127.0.0.1:5000".parse().unwrap();
     let json = r#"{"type":"send","username":"alice","message":"hello"}"#;
-    let event = parse_broadcast_message(json, addr);
+    let event = parse_client_message(json, addr);
     assert!(event.is_some());
     match event.unwrap() {
         BrokerEvent::Broadcast {
@@ -59,7 +59,7 @@ fn parse_client_message_send_produces_broadcast() {
 fn parse_client_message_logout_produces_disconnect() {
     let addr = "127.0.0.1:5000".parse().unwrap();
     let json = r#"{"type":"logout","message":"bye"}"#;
-    let event = parse_broadcast_message(json, addr);
+    let event = parse_client_message(json, addr);
     assert!(event.is_some());
     match event.unwrap() {
         BrokerEvent::Disconnect { addr: a, .. } => {
@@ -73,14 +73,14 @@ fn parse_client_message_logout_produces_disconnect() {
 fn parse_client_message_unexpected_authenticate_returns_none() {
     let addr = "127.0.0.1:5000".parse().unwrap();
     let json = r#"{"type":"authenticate","username":"a","password":"p","room_name":"r"}"#;
-    let event = parse_broadcast_message(json, addr);
+    let event = parse_client_message(json, addr);
     assert!(event.is_none());
 }
 
 #[test]
 fn parse_client_message_invalid_json_returns_none() {
     let addr = "127.0.0.1:5000".parse().unwrap();
-    let event = parse_broadcast_message("not json", addr);
+    let event = parse_client_message("not json", addr);
     assert!(event.is_none());
 }
 

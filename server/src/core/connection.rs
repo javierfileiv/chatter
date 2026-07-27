@@ -24,7 +24,7 @@ fn parse_authenticate(raw: &str) -> Result<AuthenticateUser, ServerMessage> {
 }
 
 // Parse client raw JSON and convert it to a broker broadcast request.
-fn parse_broadcast_message(raw: &str, client_addr: SocketAddr) -> Option<BrokerEvent> {
+fn parse_client_message(raw: &str, client_addr: SocketAddr) -> Option<BrokerEvent> {
     let timestamp = Local::now().format("%d/%m/%Y %H:%M:%S").to_string();
     match serde_json::from_str::<ClientMessage>(raw) {
         Ok(ClientMessage::Broadcast(send_msg)) => {
@@ -67,7 +67,7 @@ async fn ws_half_reader<T>(
         let timestamp = Local::now().format("%d/%m/%Y %H:%M:%S").to_string();
         match ws_msg {
             Ok(Message::Text(json_str)) => {
-                if let Some(event) = parse_broadcast_message(&json_str, client_addr) {
+                if let Some(event) = parse_client_message(&json_str, client_addr) {
                     let is_disconnect = matches!(event, BrokerEvent::Disconnect { .. });
                     let _ = to_broker.send(event);
                     if is_disconnect {
