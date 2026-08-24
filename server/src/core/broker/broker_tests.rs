@@ -30,7 +30,9 @@ async fn check_response(rx_from_client: &mut UnboundedReceiver<BrokerToClientMsg
             assert!(status, "Broker has not connected client");
             println!("AddedToBroker Treated");
         }
-        Ok(Some(BrokerToClientMsg::Response(BrokerRsp::JoinRoom { status, created }))) => {
+        Ok(Some(BrokerToClientMsg::Response(BrokerRsp::JoinRoom {
+            status, created, ..
+        }))) => {
             assert!(status, "Broker has not joined a room");
             if created {
                 println!("Room created");
@@ -437,7 +439,9 @@ async fn join_room_room_move_same_room_fails() {
     let resp = tokio::time::timeout(std::time::Duration::from_millis(100), rx.recv()).await;
 
     match resp {
-        Ok(Some(BrokerToClientMsg::Response(BrokerRsp::JoinRoom { status, created }))) => {
+        Ok(Some(BrokerToClientMsg::Response(BrokerRsp::JoinRoom {
+            status, created, ..
+        }))) => {
             assert!(!status, "Same room move should fail");
             assert!(!created);
         }
@@ -596,11 +600,16 @@ mod from_tests {
         let msg = BrokerToClientMsg::Response(BrokerRsp::JoinRoom {
             status: true,
             created: true,
+            room_name: "games".to_string(),
         });
         let result = ServerMessage::from(msg);
         assert!(matches!(
             result,
-            ServerMessage::Notification { ref value, .. } if value == "Room created"
+            ServerMessage::JoinRoom {
+                success: true,
+                created: true,
+                ref room_name,
+            } if room_name == "games"
         ));
     }
 
@@ -609,11 +618,16 @@ mod from_tests {
         let msg = BrokerToClientMsg::Response(BrokerRsp::JoinRoom {
             status: true,
             created: false,
+            room_name: "lounge".to_string(),
         });
         let result = ServerMessage::from(msg);
         assert!(matches!(
             result,
-            ServerMessage::Notification { ref value, .. } if value == "Room joined"
+            ServerMessage::JoinRoom {
+                success: true,
+                created: false,
+                ref room_name,
+            } if room_name == "lounge"
         ));
     }
 
@@ -622,11 +636,16 @@ mod from_tests {
         let msg = BrokerToClientMsg::Response(BrokerRsp::JoinRoom {
             status: false,
             created: false,
+            room_name: "void".to_string(),
         });
         let result = ServerMessage::from(msg);
         assert!(matches!(
             result,
-            ServerMessage::Error { ref value } if value == "Join room failed"
+            ServerMessage::JoinRoom {
+                success: false,
+                created: false,
+                ref room_name,
+            } if room_name == "void"
         ));
     }
 

@@ -103,7 +103,7 @@ pub fn build_help() -> Box<dyn View> {
     Box::new(
         Panel::new(
             TextView::new(
-                "ESC:quit | Enter:send | Commands: /help, /clear, /connect, /debug, /quit",
+                "ESC:quit | Enter:send | Commands: /help, /clear, /connect, /join, /debug, /quit",
             )
             .style(Color::Dark(BaseColor::White)),
         )

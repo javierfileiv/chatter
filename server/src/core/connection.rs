@@ -38,6 +38,11 @@ fn parse_client_message(raw: &str, client_addr: SocketAddr) -> Option<BrokerEven
                 timestamp,
             })
         }
+        Ok(ClientMessage::JoinRoom(msg)) => Some(BrokerEvent::JoinRoom {
+            sender_addr: client_addr,
+            room_name: msg.room_name,
+            timestamp,
+        }),
         Ok(ClientMessage::Logout(_)) => {
             info!("Received logout at {}", timestamp);
             Some(BrokerEvent::Disconnect {

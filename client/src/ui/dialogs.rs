@@ -82,6 +82,18 @@ fn do_connect(siv: &mut Cursive) {
     network::connect_to_server(ctx, cb_sink);
 }
 
+// Extract room to join in server.
+fn do_join_room(siv: &mut Cursive) {
+    let ctx = siv.user_data::<Arc<Context>>().unwrap().clone();
+    let cb_sink = siv.cb_sink().clone();
+    let room = siv.call_on_name("join_room_input", |v: &mut EditView| v.get_content());
+    match room {
+        Some(r) if !r.is_empty() => network::join_room(ctx, cb_sink, r.to_string()),
+        _ => ui::dialogs::set_notification(&cb_sink, "Room name is required"),
+    }
+    siv.pop_layer();
+}
+
 // Opens a dialog to entre credentials for connection.
 pub fn show_connect_dialog(siv: &mut Cursive, ctx: &Context) {
     let user = ctx.username.lock().unwrap();
@@ -108,6 +120,23 @@ pub fn show_connect_dialog(siv: &mut Cursive, ctx: &Context) {
         .title("Connect to server")
         .content(form)
         .button("Connect", do_connect)
+        .button("Cancel", |s| {
+            s.pop_layer();
+        });
+
+    siv.add_layer(dialog);
+}
+
+// Opens a dialog to change current room.
+pub fn show_join_room_dialog(siv: &mut Cursive, _ctx: &Context) {
+    let room_field = EditView::new().content("").with_name("join_room_input");
+    let form = LinearLayout::vertical()
+        .child(TextView::new("Room:"))
+        .child(room_field);
+    let dialog = Dialog::new()
+        .title("Enter room to join:")
+        .content(form)
+        .button("Accept", do_join_room)
         .button("Cancel", |s| {
             s.pop_layer();
         });
