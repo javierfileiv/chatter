@@ -5,6 +5,8 @@
 
 A real-time chat application built with Rust, using WebSocket for client-server communication and a broker-based message routing architecture.
 
+> **Note:** The client TUI was initially based on [rust-retro-chat](https://github.com/BekBrace/rust-retro-chat) by BekBrace, and has been significantly modified and extended for this project.
+
 ## Features
 
 - WebSocket-based real-time messaging
@@ -92,6 +94,31 @@ client ──WebSocket──▶ server::core::server (accept loop)
                     BrokerToClientMsg → back to connection → WebSocket → client
 ```
 
+```
+client architecture (sync main thread):
+
+  Cursive event loop ──▶ commands.rs ──▶ tx_msg (mpsc)
+         │                                    │
+         │                                    ▼
+         │                            ws_half_writer ──▶ WebSocket
+         │                                                       │
+         │                                                       ▼
+         │                            ws_half_reader ◀────── WebSocket
+         │                                    │
+         ▼                                    ▼
+      cb_sink ◀────────── handle_incoming_server_msg
+  (UI callbacks)
+```
+
+The client runs Cursive on the main thread (sync) while network I/O runs on a
+tokio task (async). Two channels bridge the two worlds:
+
+- **tx_msg** (`UnboundedSender<String>`) — commands.rs serializes `ClientMessage`
+  as JSON and sends it to `ws_half_writer`, which forwards it over WebSocket
+- **cb_sink** (`CbSink`) — the reader calls `handle_incoming_server_msg` which
+  dispatches `ServerMessage` variants and pushes UI updates via Cursive's
+  callback sink
+
 ![Message sequence diagram](docs/messages.svg)
 
 ### Auto-registration
@@ -107,7 +134,7 @@ No separate registration step is needed. The map is lost when the server restart
 
 | Crate | Role | Key Dependencies |
 |-------|------|-----------------|
-| `common` | Shared message types & errors | `serde`, `serde_json`, `anyhow`, `tokio-util` |
+| `common` | Shared message types | `serde`, `serde_json`, `chrono` |
 | `server` | WebSocket server + broker | `tokio` (full), `tokio-tungstenite`, `futures-util`, `flexi_logger`, `argon2`, `rand` |
 | `client` | Terminal TUI client | `cursive`, `clap`, `chrono`, `tokio`, `tokio-tungstenite`, `futures-util`, `flexi_logger`, `cursive-flexi-logger-view` |
 
