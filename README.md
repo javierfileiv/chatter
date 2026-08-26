@@ -183,6 +183,41 @@ Or with Docker Compose:
 docker compose up (add --build if code has been modified, otherwise cached image will be used)
 ```
 
+### Testing with Docker
+
+Once the server is running in Docker, you can test it with the client:
+
+```bash
+# Terminal 1: Start Docker server (if not already running)
+docker run -d --name chatter -p 1234:1234 chatter-server
+
+# Terminal 2: Connect with client
+cargo run --bin client -- --user alice --pass secret --room test
+
+# Test multiple clients in the same room
+cargo run --bin client -- --user bob --pass secret --room test
+cargo run --bin client -- --user charlie --pass secret --room test
+```
+
+Run integration tests against the Docker server:
+
+```bash
+source .venv/bin/activate
+PORT=1234 pytest tests/ -v
+```
+
+Check server logs:
+
+```bash
+docker logs -f chatter
+```
+
+Cleanup:
+
+```bash
+docker stop chatter && docker rm chatter
+```
+
 ### Run the Client
 
 ```bash
