@@ -30,7 +30,9 @@ async fn check_response(rx_from_client: &mut UnboundedReceiver<BrokerToClientMsg
             assert!(status, "Broker has not connected client");
             println!("AddedToBroker Treated");
         }
-        Ok(Some(BrokerToClientMsg::Response(BrokerRsp::JoinRoom { status, created }))) => {
+        Ok(Some(BrokerToClientMsg::Response(BrokerRsp::JoinRoom {
+            status, created, ..
+        }))) => {
             assert!(status, "Broker has not joined a room");
             if created {
                 println!("Room created");
@@ -437,7 +439,9 @@ async fn join_room_room_move_same_room_fails() {
     let resp = tokio::time::timeout(std::time::Duration::from_millis(100), rx.recv()).await;
 
     match resp {
-        Ok(Some(BrokerToClientMsg::Response(BrokerRsp::JoinRoom { status, created }))) => {
+        Ok(Some(BrokerToClientMsg::Response(BrokerRsp::JoinRoom {
+            status, created, ..
+        }))) => {
             assert!(!status, "Same room move should fail");
             assert!(!created);
         }
@@ -445,18 +449,136 @@ async fn join_room_room_move_same_room_fails() {
     }
 }
 
-// TryFrom conversion tests
+#[tokio::test]
+async fn disconnect_notifies_remaining_clients_in_room() {
+    let tx_broker = init();
+    let addr_alice: SocketAddr = "127.0.0.1:7001".parse().unwrap();
+    let addr_bob: SocketAddr = "127.0.0.1:7002".parse().unwrap();
 
-mod tryfrom_tests {
+    let (alice, mut rx_alice) = fake_client(addr_alice, "Alice", "games");
+    let (bob, mut rx_bob) = fake_client(addr_bob, "Bob", "games");
+
+    tx_broker
+        .send(BrokerEvent::AddUserToBroker {
+            client: alice,
+            timestamp: test_timestamp(),
+        })
+        .unwrap();
+    check_response(&mut rx_alice).await;
+
+    tx_broker
+        .send(BrokerEvent::AddUserToBroker {
+            client: bob,
+            timestamp: test_timestamp(),
+        })
+        .unwrap();
+    check_response(&mut rx_bob).await;
+
+    // Disconnect Alice
+    tx_broker
+        .send(BrokerEvent::Disconnect {
+            addr: addr_alice,
+            timestamp: test_timestamp(),
+        })
+        .unwrap();
+
+    // Bob should receive UserLogoutNtf about Alice leaving
+    let msg = tokio::time::timeout(std::time::Duration::from_millis(100), rx_bob.recv())
+        .await
+        .expect("Bob should receive a message")
+        .expect("Channel should be open");
+    match msg {
+        BrokerToClientMsg::UserLogoutNtf { text, .. } => {
+            assert!(
+                text.contains("Alice"),
+                "Expected mention of Alice, got: {text}"
+            );
+            assert!(
+                text.to_lowercase().contains("left"),
+                "Expected 'left' in notification, got: {text}"
+            );
+        }
+        other => panic!("Bob expected UserLogoutNtf, got: {other:?}"),
+    }
+
+    // Alice's channel should be closed after disconnect (sender dropped by broker)
+    let alice_after =
+        tokio::time::timeout(std::time::Duration::from_millis(50), rx_alice.recv()).await;
+    match alice_after {
+        Ok(None) => {} // channel closed — expected after disconnect
+        other => panic!("Alice's channel should be closed after disconnect, got: {other:?}"),
+    }
+}
+
+#[tokio::test]
+async fn disconnect_unknown_addr_does_not_panic() {
+    let tx_broker = init();
+    let unknown: SocketAddr = "127.0.0.1:9999".parse().unwrap();
+
+    tx_broker
+        .send(BrokerEvent::Disconnect {
+            addr: unknown,
+            timestamp: test_timestamp(),
+        })
+        .unwrap();
+}
+
+#[tokio::test]
+async fn disconnect_last_client_removes_empty_room() {
+    let tx_broker = init();
+    let addr: SocketAddr = "127.0.0.1:7003".parse().unwrap();
+
+    let (client, mut rx) = fake_client(addr, "Solo", "empty_room");
+
+    tx_broker
+        .send(BrokerEvent::AddUserToBroker {
+            client,
+            timestamp: test_timestamp(),
+        })
+        .unwrap();
+    check_response(&mut rx).await;
+
+    tx_broker
+        .send(BrokerEvent::Disconnect {
+            addr,
+            timestamp: test_timestamp(),
+        })
+        .unwrap();
+
+    // After disconnect, the room should be removed.
+    // Try joining with another client in the same room — it should be "created", not "joined".
+    let addr2: SocketAddr = "127.0.0.1:7004".parse().unwrap();
+    let (client2, mut rx2) = fake_client(addr2, "Newbie", "empty_room");
+
+    tx_broker
+        .send(BrokerEvent::AddUserToBroker {
+            client: client2,
+            timestamp: test_timestamp(),
+        })
+        .unwrap();
+
+    let resp = tokio::time::timeout(std::time::Duration::from_millis(100), rx2.recv())
+        .await
+        .expect("New client should receive a response")
+        .expect("Channel should be open");
+    match resp {
+        BrokerToClientMsg::Response(BrokerRsp::AddedToBroker { status }) => {
+            assert!(status, "New client should join successfully");
+        }
+        other => panic!("Expected AddedToBroker, got: {other:?}"),
+    }
+}
+
+// From conversion tests
+
+mod from_tests {
     use super::*;
     use common::ws_messages::ServerMessage;
 
     #[test]
-    fn tryfrom_broker_connected_success() {
+    fn from_broker_connected_success() {
         let msg = BrokerToClientMsg::Response(BrokerRsp::AddedToBroker { status: true });
-        let result = ServerMessage::try_from(msg);
-        assert!(result.is_ok());
-        let result = result.unwrap();
+        let result = ServerMessage::from(msg);
         assert!(matches!(
             result,
             ServerMessage::Notification { ref value, .. } if value == "Connected"
@@ -464,9 +586,9 @@ mod tryfrom_tests {
     }
 
     #[test]
-    fn tryfrom_broker_connected_failure() {
+    fn from_broker_connected_failure() {
         let msg = BrokerToClientMsg::Response(BrokerRsp::AddedToBroker { status: false });
-        let result = ServerMessage::try_from(msg).unwrap();
+        let result = ServerMessage::from(msg);
         assert!(matches!(
             result,
             ServerMessage::Error { ref value } if value == "Connection failed"
@@ -474,53 +596,68 @@ mod tryfrom_tests {
     }
 
     #[test]
-    fn tryfrom_broker_joinroom_success_created() {
+    fn from_broker_joinroom_success_created() {
         let msg = BrokerToClientMsg::Response(BrokerRsp::JoinRoom {
             status: true,
             created: true,
+            room_name: "games".to_string(),
         });
-        let result = ServerMessage::try_from(msg).unwrap();
+        let result = ServerMessage::from(msg);
         assert!(matches!(
             result,
-            ServerMessage::Notification { ref value, .. } if value == "Room created"
+            ServerMessage::JoinRoom {
+                success: true,
+                created: true,
+                ref room_name,
+            } if room_name == "games"
         ));
     }
 
     #[test]
-    fn tryfrom_broker_joinroom_success_joined() {
+    fn from_broker_joinroom_success_joined() {
         let msg = BrokerToClientMsg::Response(BrokerRsp::JoinRoom {
             status: true,
             created: false,
+            room_name: "lounge".to_string(),
         });
-        let result = ServerMessage::try_from(msg).unwrap();
+        let result = ServerMessage::from(msg);
         assert!(matches!(
             result,
-            ServerMessage::Notification { ref value, .. } if value == "Room joined"
+            ServerMessage::JoinRoom {
+                success: true,
+                created: false,
+                ref room_name,
+            } if room_name == "lounge"
         ));
     }
 
     #[test]
-    fn tryfrom_broker_joinroom_failure() {
+    fn from_broker_joinroom_failure() {
         let msg = BrokerToClientMsg::Response(BrokerRsp::JoinRoom {
             status: false,
             created: false,
+            room_name: "void".to_string(),
         });
-        let result = ServerMessage::try_from(msg).unwrap();
+        let result = ServerMessage::from(msg);
         assert!(matches!(
             result,
-            ServerMessage::Error { ref value } if value == "Join room failed"
+            ServerMessage::JoinRoom {
+                success: false,
+                created: false,
+                ref room_name,
+            } if room_name == "void"
         ));
     }
 
     #[test]
-    fn tryfrom_broker_chat_message() {
+    fn from_broker_chat_message() {
         let msg = BrokerToClientMsg::ChatMessage {
             sender: "127.0.0.1:8080".parse().unwrap(),
             sender_name: "alice".to_string(),
             text: "hello".to_string(),
             timestamp: "17/06/2026 18:30:00".to_string(),
         };
-        let result = ServerMessage::try_from(msg).unwrap();
+        let result = ServerMessage::from(msg);
         assert!(matches!(
             result,
             ServerMessage::Chat { ref sender, ref message, ref timestamp }
@@ -529,12 +666,12 @@ mod tryfrom_tests {
     }
 
     #[test]
-    fn tryfrom_broker_notification() {
+    fn from_broker_notification() {
         let msg = BrokerToClientMsg::UserLogoutNtf {
             text: "user left".to_string(),
             timestamp: "17/06/2026 18:30:00".to_string(),
         };
-        let result = ServerMessage::try_from(msg).unwrap();
+        let result = ServerMessage::from(msg);
         assert!(matches!(
             result,
             ServerMessage::UserLogoutNtf { ref value, ref timestamp }

@@ -1,0 +1,51 @@
+@startuml
+skinparam participantPadding 20
+box "Client" #LightBlue
+  participant Client
+end box
+box "connection.rs" #LightGreen
+  participant Handle
+  participant Users
+end box
+box "Broker Task" #LightYellow
+  participant Broker
+end box
+box "Writer Task" #LightCoral
+  participant Writer
+end box
+
+== 1. Authenticate ==
+Client -> Handle: ClientMessage::Authenticate\n{username, password, room_name}
+Handle -> Users: users::authenticate()
+
+alt Registered (new user)
+  Users --> Handle: AuthResult::Registered
+  Handle --> Client: ServerMessage::AuthResult\n{success: true, msg: "New account created"}
+else Authenticated (existing user)
+  Users --> Handle: AuthResult::Authenticated
+else Denied (wrong password)
+  Users --> Handle: AuthResult::Denied
+  Handle --> Client: ServerMessage::AuthResult\n{success: false, msg: "Wrong password"}
+  note right: Handle/Disconnect
+end
+
+== 2. Join broker & room ==
+Handle -> Broker: BrokerEvent::AddUserToBroker\n{client, timestamp}
+Broker -> Broker: add_user_to_broker()\n→ add user/room
+Broker --> Writer: BrokerToClientMsg::Response\n(BrokerRsp::AddedToBroker {status: true})
+Writer --> Client: ServerMessage::Notification\n{value: "Connected"}
+
+== 3. Broadcast ==
+Client -> Handle: ClientMessage::Broadcast\n{username, message}
+Handle -> Broker: BrokerEvent::Broadcast\n{sender_addr, str_message, timestamp}
+Broker -> Broker: broadcast to all\nin room (incl. sender)
+Broker --> Writer: BrokerToClientMsg::ChatMessage\n{sender_name, text, timestamp}
+Writer --> Client: ServerMessage::Chat\n{sender, message, timestamp}
+
+== 4. Logout ==
+Client -> Handle: ClientMessage::Logout\n{message}
+Handle -> Broker: BrokerEvent::Disconnect\n{addr, timestamp}
+Broker -> Broker: remove client,\nnotify remaining
+Broker --> Writer: BrokerToClientMsg::UserLogoutNtf\n{text: "X has left the room"}
+Writer --> Client: ServerMessage::UserLogoutNtf\n{value: "X has left the room"}
+@enduml

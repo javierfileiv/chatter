@@ -20,7 +20,7 @@ pub fn handle_send(siv: &mut Cursive, ctx: &Arc<Context>, msg: String) {
         "/help" => {
             siv.call_on_name("messages", |view: &mut TextView| {
                 view.append(
-                    "\n=== Commands ===\n/help - Show this help\n/clear - Clear messages\n/connect - Connect to server\n/debug - Toggle debug log view\n/quit - Exit chat\n\n"
+                    "\n=== Commands ===\n/help - Show this help\n/clear - Clear messages\n/connect - Connect to server\n/join - Join or create a room\n/debug - Toggle debug log view\n/quit - Exit chat\n\n"
                 );
             });
         }
@@ -30,6 +30,9 @@ pub fn handle_send(siv: &mut Cursive, ctx: &Arc<Context>, msg: String) {
         }
         "/connect" => {
             ui::dialogs::show_connect_dialog(siv, ctx);
+        }
+        "/join" => {
+            ui::dialogs::show_join_room_dialog(siv, ctx);
         }
         "/debug" => {
             siv.call_on_name(

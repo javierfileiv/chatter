@@ -27,6 +27,15 @@ pub struct Logout {
     pub message: String,
 }
 
+/// Socket message to join a room
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Room {
+    /// The client's username for display
+    pub username: String,
+    /// Room to join or create
+    pub room_name: String,
+}
+
 /// Messages the client can send to the server via WebSocket
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type")]
@@ -38,6 +47,9 @@ pub enum ClientMessage {
     // Broadcast msg
     #[serde(rename = "send")]
     Broadcast(SendMessage),
+    //Join an existing or create a new room
+    #[serde(rename = "join")]
+    JoinRoom(Room),
     // Logout msg
     #[serde(rename = "logout")]
     Logout(Logout),
@@ -58,10 +70,17 @@ pub enum ServerMessage {
         message: String,
         timestamp: String,
     },
-    // Server communicates something
+    // Server joinroom response
+    #[serde(rename = "join_room")]
+    JoinRoom {
+        success: bool,
+        created: bool,
+        room_name: String,
+    },
+    // Server notifies something
     #[serde(rename = "notification")]
     Notification { value: String, timestamp: String },
-    // Server communicates something
+    // Server notifies user logout in current room
     #[serde(rename = "user_logout")]
     UserLogoutNtf { value: String, timestamp: String },
     // Some error in the server

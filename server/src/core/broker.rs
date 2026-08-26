@@ -69,7 +69,6 @@ impl BrokerClient {
     }
 }
 /// Internal broker events used by clients
-#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub enum BrokerEvent {
     /// Event when user is added to broker list
@@ -106,8 +105,7 @@ pub enum BrokerEvent {
 }
 
 /// Internal broker response to client commands
-#[allow(dead_code)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub enum BrokerRsp {
     /// Response for successful connection to broker
     AddedToBroker {
@@ -120,11 +118,12 @@ pub enum BrokerRsp {
         status: bool,
         /// Was the room created or joined
         created: bool,
+        /// The room name
+        room_name: String,
     },
 }
 
 /// Internal broker to client response message
-#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub enum BrokerToClientMsg {
     /// Internal action response
@@ -168,35 +167,39 @@ impl BrokerToClientMsg {
     }
 }
 
-impl TryFrom<BrokerToClientMsg> for ServerMessage {
-    type Error = String;
-
-    fn try_from(msg: BrokerToClientMsg) -> Result<Self, String> {
+impl From<BrokerToClientMsg> for ServerMessage {
+    fn from(msg: BrokerToClientMsg) -> Self {
         let timestamp = Local::now().format("%d/%m/%Y %H:%M:%S").to_string();
         match msg {
             BrokerToClientMsg::Response(BrokerRsp::AddedToBroker { status }) => {
                 if status {
-                    Ok(ServerMessage::Notification {
+                    ServerMessage::Notification {
                         value: "Connected".to_string(),
                         timestamp,
-                    })
+                    }
                 } else {
-                    Ok(ServerMessage::Error {
+                    ServerMessage::Error {
                         value: "Connection failed".to_string(),
-                    })
+                    }
                 }
             }
-            BrokerToClientMsg::Response(BrokerRsp::JoinRoom { status, created }) => {
+            BrokerToClientMsg::Response(BrokerRsp::JoinRoom {
+                status,
+                created,
+                room_name,
+            }) => {
                 if status {
-                    let action = if created { "created" } else { "joined" };
-                    Ok(ServerMessage::Notification {
-                        value: format!("Room {}", action),
-                        timestamp,
-                    })
+                    ServerMessage::JoinRoom {
+                        success: true,
+                        created,
+                        room_name,
+                    }
                 } else {
-                    Ok(ServerMessage::Error {
-                        value: "Join room failed".to_string(),
-                    })
+                    ServerMessage::JoinRoom {
+                        success: false,
+                        created,
+                        room_name,
+                    }
                 }
             }
             BrokerToClientMsg::ChatMessage {
@@ -204,17 +207,15 @@ impl TryFrom<BrokerToClientMsg> for ServerMessage {
                 text,
                 timestamp,
                 ..
-            } => Ok(ServerMessage::Chat {
+            } => ServerMessage::Chat {
                 sender: sender_name,
                 message: text,
                 timestamp,
-            }),
-            BrokerToClientMsg::UserLogoutNtf { text, timestamp } => {
-                Ok(ServerMessage::UserLogoutNtf {
-                    value: text,
-                    timestamp,
-                })
-            }
+            },
+            BrokerToClientMsg::UserLogoutNtf { text, timestamp } => ServerMessage::UserLogoutNtf {
+                value: text,
+                timestamp,
+            },
         }
     }
 }
@@ -328,9 +329,16 @@ fn join_room(ctx: &mut Broker, joining_client: JoinRoomType, room_name: String) 
 /// Add a client in the broker internal list
 fn add_user_to_broker(ctx: &mut Broker, client: BrokerClient) -> bool {
     info!(
-        "Adding client: {} (addr:{}) to room: {}",
-        client.str_id, client.addr, client.room_name
+        "Adding user {} (addr {}) to broker",
+        client.str_id, client.addr
     );
+
+    if ctx.clients.contains_key(&client.addr) {
+        warn!(
+            "Client {} existed in broker, invalid FirstConnect",
+            client.str_id
+        );
+    }
     let user_name = client.str_id.clone();
     let room_name = client.room_name.clone();
     let (status, _) = join_room(ctx, JoinRoomType::FirstConnect(client), room_name);
@@ -393,10 +401,15 @@ pub async fn run(mut rx_events: mpsc::UnboundedReceiver<BrokerEvent>) {
                     "Broker: JoinRoom: {} {} at {}",
                     sender_addr, room_name, timestamp
                 );
+                let room_name_clone = room_name.clone();
                 let (status, created) =
                     join_room(&mut ctx, JoinRoomType::RoomMove(sender_addr), room_name);
                 if let Some(client) = ctx.clients.get(&sender_addr) {
-                    client.send_response(BrokerRsp::JoinRoom { status, created });
+                    client.send_response(BrokerRsp::JoinRoom {
+                        status,
+                        created,
+                        room_name: room_name_clone,
+                    });
                 } else {
                     warn!("JoinRoom: no client at {sender_addr}, dropping response");
                 }

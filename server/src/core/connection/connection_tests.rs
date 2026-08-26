@@ -40,7 +40,7 @@ fn parse_authenticate_rejects_invalid_json() {
 fn parse_client_message_send_produces_broadcast() {
     let addr = "127.0.0.1:5000".parse().unwrap();
     let json = r#"{"type":"send","username":"alice","message":"hello"}"#;
-    let event = parse_broadcast_message(json, addr);
+    let event = parse_client_message(json, addr);
     assert!(event.is_some());
     match event.unwrap() {
         BrokerEvent::Broadcast {
@@ -59,7 +59,7 @@ fn parse_client_message_send_produces_broadcast() {
 fn parse_client_message_logout_produces_disconnect() {
     let addr = "127.0.0.1:5000".parse().unwrap();
     let json = r#"{"type":"logout","message":"bye"}"#;
-    let event = parse_broadcast_message(json, addr);
+    let event = parse_client_message(json, addr);
     assert!(event.is_some());
     match event.unwrap() {
         BrokerEvent::Disconnect { addr: a, .. } => {
@@ -73,15 +73,34 @@ fn parse_client_message_logout_produces_disconnect() {
 fn parse_client_message_unexpected_authenticate_returns_none() {
     let addr = "127.0.0.1:5000".parse().unwrap();
     let json = r#"{"type":"authenticate","username":"a","password":"p","room_name":"r"}"#;
-    let event = parse_broadcast_message(json, addr);
+    let event = parse_client_message(json, addr);
     assert!(event.is_none());
 }
 
 #[test]
 fn parse_client_message_invalid_json_returns_none() {
     let addr = "127.0.0.1:5000".parse().unwrap();
-    let event = parse_broadcast_message("not json", addr);
+    let event = parse_client_message("not json", addr);
     assert!(event.is_none());
+}
+
+#[test]
+fn parse_client_message_join_room_produces_join_event() {
+    let addr = "127.0.0.1:5000".parse().unwrap();
+    let json = r#"{"type":"join","username":"alice","room_name":"test_room"}"#;
+    let event = parse_client_message(json, addr);
+    assert!(event.is_some());
+    match event.unwrap() {
+        BrokerEvent::JoinRoom {
+            sender_addr,
+            room_name,
+            ..
+        } => {
+            assert_eq!(sender_addr, addr);
+            assert_eq!(room_name, "test_room");
+        }
+        other => panic!("expected JoinRoom, got {other:?}"),
+    }
 }
 
 fn test_addr() -> SocketAddr {
@@ -262,6 +281,7 @@ async fn ws_half_writer_integration_notification() {
         tx.send(BrokerToClientMsg::Response(BrokerRsp::JoinRoom {
             status: true,
             created: true,
+            room_name: "test_room".to_string(),
         }))
         .unwrap();
         drop(tx);
@@ -271,9 +291,10 @@ async fn ws_half_writer_integration_notification() {
         match msg {
             Message::Text(text) => {
                 let parsed: serde_json::Value = serde_json::from_str(&text).unwrap();
-                assert_eq!(parsed["type"], "notification");
-                assert_eq!(parsed["value"], "Room created");
-                assert!(parsed["timestamp"].is_string());
+                assert_eq!(parsed["type"], "join_room");
+                assert!(parsed["success"].as_bool().unwrap());
+                assert!(parsed["created"].as_bool().unwrap());
+                assert_eq!(parsed["room_name"], "test_room");
             }
             other => panic!("expected Text message, got {other:?}"),
         }

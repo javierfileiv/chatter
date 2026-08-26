@@ -1,5 +1,5 @@
 use crate::{ui, Context};
-use common::ws_messages::{AuthenticateUser, ClientMessage, ServerMessage};
+use common::ws_messages::{AuthenticateUser, ClientMessage, Room, ServerMessage};
 use cursive::{CbSink, Cursive};
 use futures_util::{
     stream::{SplitSink, SplitStream},
@@ -122,7 +122,7 @@ async fn ws_half_reader(
         match msg {
             Ok(Message::Text(text)) => {
                 info!("Received from server: {}", text);
-                handle_incoming_server_msg(&cb_sink, text.to_string());
+                handle_incoming_server_msg(&ctx, &cb_sink, text.to_string());
             }
             Ok(Message::Close(_)) => {
                 info!("connection closed");
@@ -157,7 +157,7 @@ async fn ws_half_writer(
     info!("Writer channel closed");
 }
 
-fn handle_incoming_server_msg(cb_sink: &CbSink, ws_server_msg: String) {
+fn handle_incoming_server_msg(ctx: &Arc<Context>, cb_sink: &CbSink, ws_server_msg: String) {
     // Convert JSON into ServerMessage and fill in Messages ScrollView
     if let Ok(msg_struct) = serde_json::from_str::<ServerMessage>(&ws_server_msg) {
         match msg_struct {
@@ -179,6 +179,20 @@ fn handle_incoming_server_msg(cb_sink: &CbSink, ws_server_msg: String) {
                 let msg = format!("{}: {}", timestamp, value);
                 ui::dialogs::display_message(cb_sink, msg);
             }
+            ServerMessage::JoinRoom {
+                success,
+                created,
+                room_name,
+            } => {
+                if success {
+                    *ctx.room.lock().unwrap() = room_name.clone();
+                    ui::status::set_room_name(cb_sink, &room_name);
+                    let action = if created { "created" } else { "joined" };
+                    ui::dialogs::set_notification(cb_sink, &format!("Room {action}: {room_name}"));
+                } else {
+                    ui::dialogs::set_notification(cb_sink, "Failed to join room");
+                }
+            }
             ServerMessage::Error { value } => {
                 let str = format!("Received Error ServerMessage: {}.", value);
                 error!("{}", str);
@@ -194,5 +208,19 @@ fn handle_incoming_server_msg(cb_sink: &CbSink, ws_server_msg: String) {
         let str = "Unable to deserialize Server message.";
         error!("{}", str);
         ui::dialogs::set_notification(cb_sink, str);
+    }
+}
+
+pub fn join_room(ctx: Arc<Context>, cb_sink: CbSink, room_name: String) {
+    ui::dialogs::set_notification(&cb_sink, &format!("Joining {room_name} room..."));
+    let username = ctx.username.lock().unwrap().clone();
+    let join = ClientMessage::JoinRoom(Room {
+        username,
+        room_name,
+    });
+    if let Ok(json) = serde_json::to_string(&join) {
+        if let Some(tx) = ctx.tx_msg.lock().unwrap().as_ref() {
+            tx.send(json).ok();
+        }
     }
 }
