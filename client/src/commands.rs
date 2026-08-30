@@ -32,7 +32,11 @@ pub fn handle_send(siv: &mut Cursive, ctx: &Arc<Context>, msg: String) {
             ui::dialogs::show_connect_dialog(siv, ctx);
         }
         "/join" => {
-            ui::dialogs::show_join_room_dialog(siv, ctx);
+            if ctx.tx_msg.lock().unwrap().is_some() {
+                ui::dialogs::show_join_room_dialog(siv, ctx);
+            } else {
+                ui::dialogs::set_notification(&cb_sink, "Not connected — use /connect first");
+            }
         }
         "/debug" => {
             siv.call_on_name(
