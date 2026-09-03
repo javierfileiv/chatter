@@ -18,7 +18,7 @@ pub fn set_connection_status(ctx: Arc<Context>, cb_sink: &CbSink, connected: boo
             set_room_name(cb_sink, "");
 
             *ctx.connected.lock().unwrap() = false;
-            // client tx channel if connection has dropped.
+            // Drop sender if connection has dropped.
             *ctx.tx_msg.lock().unwrap() = None;
             cb_sink
                 .send(Box::new(move |s| {
