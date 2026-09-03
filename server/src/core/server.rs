@@ -1,14 +1,20 @@
 use super::broker;
 use super::connection;
+use crate::auth::users::UserStore;
 use flexi_logger::{Duplicate, FileSpec, Logger};
 use log::info;
+use std::sync::Arc;
 use tokio::net::TcpListener;
 use tokio::signal;
 use tokio::task::JoinSet;
 use tokio_tungstenite::accept_async;
 
 // Example taken from: https://websocket.org/guides/languages/rust/
-pub async fn run(listener: TcpListener, log_dir: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn run(
+    listener: TcpListener,
+    log_dir: &str,
+    user_store: Arc<UserStore>,
+) -> Result<(), Box<dyn std::error::Error>> {
     let mut tasks = JoinSet::new();
 
     Logger::try_with_str("info")?
@@ -34,6 +40,7 @@ pub async fn run(listener: TcpListener, log_dir: &str) -> Result<(), Box<dyn std
         tokio::select! {
             Ok((stream, addr)) = listener.accept() => {
                 let tx_clone = tx_broker.clone();
+                let user_store_clone = user_store.clone();
                 info!("New connection from {addr}");
                 tasks.spawn(async move {
 
@@ -41,7 +48,7 @@ pub async fn run(listener: TcpListener, log_dir: &str) -> Result<(), Box<dyn std
                         eprintln!("{addr} failed to connect");
                         return;
                     };
-                    connection::handle(ws, addr, tx_clone).await;
+                    connection::handle(ws, addr, tx_clone, user_store_clone).await;
                 });
             }
             _ = signal::ctrl_c() => {
