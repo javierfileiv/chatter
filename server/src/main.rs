@@ -1,8 +1,10 @@
 mod auth;
 mod core;
 
+use auth::users::UserStore;
 use clap::Parser;
 use core::server;
+use std::sync::Arc;
 use tokio::net::TcpListener;
 
 #[derive(Parser, Debug)]
@@ -22,6 +24,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let addr = format!("{}:{}", args.host, args.port);
     let listener = TcpListener::bind(&addr).await?;
 
-    server::run(listener, &args.log_dir).await?;
+    let user_store = Arc::new(UserStore::new());
+    server::run(listener, &args.log_dir, user_store).await?;
     Ok(())
 }

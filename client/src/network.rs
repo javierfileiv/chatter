@@ -78,6 +78,7 @@ async fn handle_connection(ctx: Arc<Context>, ws: WebSocketStream<TcpStream>, cb
             _ => {
                 let msg = "Authentication failed";
                 error!("{}", msg);
+                //TODO: Remove username and password stored in context on fn do_connect(siv: &mut Cursive).
                 ui::dialogs::set_notification(&cb_sink, msg);
                 return;
             }

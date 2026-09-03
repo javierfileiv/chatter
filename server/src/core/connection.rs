@@ -1,13 +1,14 @@
 #[cfg(test)]
 mod connection_tests;
 
-use crate::auth::users;
+use crate::auth::users::{AuthResult, UserStore};
 use crate::core::broker::{BrokerClient, BrokerEvent, BrokerToClientMsg};
 use chrono::Local;
 use common::ws_messages::{AuthenticateUser, ClientMessage, ServerMessage};
 use futures_util::{Sink, SinkExt, Stream, StreamExt};
 use log::{error, info, warn};
 use std::net::SocketAddr;
+use std::sync::Arc;
 use tokio::select;
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use tokio_tungstenite::tungstenite::{Error, Message};
@@ -132,8 +133,12 @@ where
     info!("Broker channel closed, writer shutting down");
 }
 
-pub async fn handle<S>(ws: S, addr: SocketAddr, broker_sender: UnboundedSender<BrokerEvent>)
-where
+pub async fn handle<S>(
+    ws: S,
+    addr: SocketAddr,
+    broker_sender: UnboundedSender<BrokerEvent>,
+    user_store: Arc<UserStore>,
+) where
     S: Stream<Item = Result<Message, Error>> + Sink<Message>,
 {
     let (mut sink, mut stream) = ws.split();
@@ -155,10 +160,10 @@ where
     let str_id = auth_msg.username.clone();
     let password = auth_msg.password.clone();
 
-    let (success, msg) = match users::authenticate(&str_id, &password) {
-        users::AuthResult::Registered => (true, Some("New account created".to_string())),
-        users::AuthResult::Authenticated => (true, None),
-        users::AuthResult::Denied => (false, Some("Wrong password".to_string())),
+    let (success, msg) = match user_store.authenticate(&str_id, &password) {
+        AuthResult::Registered => (true, Some("New account created".to_string())),
+        AuthResult::Authenticated => (true, None),
+        AuthResult::Denied => (false, Some("Wrong password".to_string())),
     };
     let response = ServerMessage::AuthResult { success, msg };
 
