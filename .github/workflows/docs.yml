@@ -29,7 +29,8 @@ jobs:
 
       - name: Create index redirect
         run: |
-          echo '<!DOCTYPE html>
+          cat > target/doc/index.html << 'EOF'
+          <!DOCTYPE html>
           <html>
             <head>
               <meta http-equiv="refresh" content="0; url=server/index.html">
@@ -38,7 +39,15 @@ jobs:
             <body>
               <p>Redirecting to <a href="server/index.html">server documentation</a>...</p>
             </body>
-          </html>' > target/doc/index.html
+          </html>
+          EOF
+
+      - name: List generated files
+        run: |
+          echo "Generated documentation files:"
+          ls -la target/doc/
+          echo "Index.html content:"
+          cat target/doc/index.html
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
