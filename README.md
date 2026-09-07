@@ -300,11 +300,12 @@ Tests cover: authentication, message broadcasting, room isolation, logout, and d
 
 ### CI Workflows
 
-Three GitHub Actions workflows run on push/PR to main/master:
+Four GitHub Actions workflows run on push/PR to main/master:
 
 - **rust-ci.yml** — builds, runs unit tests, checks formatting and clippy
 - **coverage.yml** — generates coverage report, deploys HTML to GitHub Pages
 - **integration.yml** — runs Python integration tests via `./scripts/test_integration.sh`
+- **docs.yml** — generates Rust documentation, deploys to GitHub Pages
 
 ### Known Gaps
 
