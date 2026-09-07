@@ -1,3 +1,35 @@
+//! User authentication and registration module
+//!
+//! This module handles user authentication using Argon2 password hashing.
+//! It provides automatic registration for new users on their first connection attempt.
+//!
+//! # Security
+//!
+//! Passwords are never stored in plain text. Instead, they are hashed using
+//! Argon2id with a random salt for each user. This provides resistance against
+//! rainbow table attacks and GPU-based cracking attempts.
+//!
+//! # Storage
+//!
+//! Currently, user credentials are stored in-memory using a `HashMap`.
+//! This means all users are lost when the server restarts. For production use,
+//! this should be replaced with persistent storage (database, file, etc.).
+//!
+//! # Example
+//!
+//! ```rust
+//! use server::auth::users::{UserStore, AuthResult};
+//!
+//! let store = UserStore::new();
+//!
+//! // First attempt: user is automatically registered
+//! assert!(matches!(store.authenticate("alice", "secret"), AuthResult::Registered));
+//!
+//! // Subsequent attempts: password is verified
+//! assert!(matches!(store.authenticate("alice", "secret"), AuthResult::Authenticated));
+//! assert!(matches!(store.authenticate("alice", "wrong"), AuthResult::Denied));
+//! ```
+
 use argon2::{
     password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
     Argon2,

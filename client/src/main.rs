@@ -1,3 +1,45 @@
+//! Chatter Client - Terminal-based chat application with TUI
+//!
+//! This is the main entry point for the chatter client application.
+//! It provides a terminal user interface (TUI) built with Cursive for
+//! real-time chat communication over WebSocket.
+//!
+//! # Features
+//!
+//! - **Terminal UI**: Retro-themed interface with messages, input, and status
+//! - **Real-time chat**: WebSocket-based communication with the server
+//! - **Room management**: Join different chat rooms via `/join` command
+//! - **Debug logging**: Toggleable debug panel showing network activity
+//! - **Commands**: Slash commands for navigation and control
+//!
+//! # Architecture
+//!
+//! The client runs two concurrent tasks:
+//! - **Reader**: Receives messages from server, updates TUI
+//! - **Writer**: Sends messages from TUI input to server
+//!
+//! The main thread runs the Cursive event loop, while network I/O happens
+//! in background Tokio tasks.
+//!
+//! # Commands
+//!
+//! - `/help` - Show available commands
+//! - `/clear` - Clear message history
+//! - `/connect` - Open connection dialog
+//! - `/join` - Join a different room
+//! - `/debug` - Toggle debug log panel
+//! - `/quit` - Exit the application
+//!
+//! # Example
+//!
+//! ```bash
+//! # Start with defaults (connect to localhost:1234)
+//! cargo run --bin client
+//!
+//! # Specify server and credentials
+//! cargo run --bin client -- --user alice --pass secret --ip 192.168.1.100 --port 1234
+//! ```
+
 use clap::Parser;
 use flexi_logger::{FileSpec, Logger};
 use log::info;

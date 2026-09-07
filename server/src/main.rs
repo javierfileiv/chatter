@@ -1,3 +1,26 @@
+//! Chatter Server - WebSocket-based chat server
+//!
+//! This is the main entry point for the chatter server application.
+//! It parses command-line arguments, binds to a TCP port, and starts
+//! the WebSocket server that handles client connections.
+//!
+//! # Architecture
+//!
+//! The server uses a broker pattern for message routing:
+//! - Each client connection is handled in a separate async task
+//! - Messages are routed through a central broker that manages rooms
+//! - Authentication uses Argon2 password hashing with auto-registration
+//!
+//! # Example
+//!
+//! ```bash
+//! # Start server on default port 1234
+//! cargo run --bin server
+//!
+//! # Start on custom port
+//! cargo run --bin server -- --port 3000
+//! ```
+
 mod auth;
 mod core;
 

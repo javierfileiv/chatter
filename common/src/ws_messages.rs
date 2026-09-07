@@ -1,3 +1,45 @@
+//! WebSocket message protocol definitions
+//!
+//! This module defines the JSON message types exchanged between client and server
+//! over WebSocket connections. All messages are serialized/deserialized using serde.
+//!
+//! # Protocol Overview
+//!
+//! Messages use a tagged union format with a `"type"` field:
+//!
+//! ```json
+//! {
+//!   "type": "authenticate",
+//!   "username": "alice",
+//!   "password": "secret",
+//!   "room_name": "lobby"
+//! }
+//! ```
+//!
+//! # Client → Server Messages ([`ClientMessage`])
+//!
+//! - `authenticate`: Initial authentication with username, password, and room
+//! - `send`: Broadcast a text message to the current room
+//! - `join`: Request to join a different room
+//! - `logout`: Graceful disconnection
+//!
+//! # Server → Client Messages ([`ServerMessage`])
+//!
+//! - `auth_result`: Authentication response with success status
+//! - `chat`: Incoming chat message from another user
+//! - `notification`: System notifications (room joined, connected, etc.)
+//! - `user_logout`: Notification when another user leaves the room
+//! - `join_room`: Response to a room join request
+//! - `error`: Error messages
+//!
+//! # Example Flow
+//!
+//! 1. Client sends `authenticate` message
+//! 2. Server responds with `auth_result`
+//! 3. Client sends `send` messages to chat
+//! 4. Server broadcasts `chat` messages to all users in the room
+//! 5. Client sends `logout` to disconnect
+
 use serde::{Deserialize, Serialize};
 
 /// Socket message to authenticate and register a new client

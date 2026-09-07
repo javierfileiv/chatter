@@ -1,3 +1,40 @@
+//! Central message broker for room management and message routing
+//!
+//! The broker is the heart of the server's message routing system. It runs as a
+//! dedicated async task and manages:
+//!
+//! - **Client registration**: Tracks connected clients and their metadata
+//! - **Room management**: Creates rooms on-demand and tracks room membership
+//! - **Message broadcasting**: Routes messages to all clients in a room
+//! - **Client lifecycle**: Handles joins, leaves, and disconnections
+//!
+//! # Architecture
+//!
+//! The broker uses an event-driven pattern with channels:
+//!
+//! ```text
+//! Client Connection → BrokerEvent → Broker → BrokerToClientMsg → Client Connection
+//! ```
+//!
+//! - [`BrokerEvent`]: Events sent from connection handlers to the broker
+//! - [`BrokerToClientMsg`]: Messages sent from the broker back to clients
+//! - [`BrokerClient`]: Represents a connected client within the broker
+//!
+//! # Thread Safety
+//!
+//! The broker runs in a single task but handles multiple clients concurrently.
+//! Communication happens through `mpsc::unbounded_channel`, avoiding the need
+//! for shared state mutexes.
+//!
+//! # Example Flow
+//!
+//! 1. Client connects and sends authentication
+//! 2. Connection handler creates a `BrokerClient` and sends `BrokerEvent::AddUserToBroker`
+//! 3. Broker adds client to its internal state and room membership
+//! 4. Broker sends back `BrokerRsp::AddedToBroker` confirmation
+//! 5. Client can now send broadcast messages to the room
+//! 6. Broker routes messages to all clients in the same room
+
 #[cfg(test)]
 mod broker_tests;
 
