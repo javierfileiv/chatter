@@ -1,3 +1,40 @@
+//! WebSocket connection handler for individual client sessions
+//!
+//! This module manages the lifecycle of a single client connection, from
+//! authentication through message exchange to disconnection.
+//!
+//! # Connection Flow
+//!
+//! Each client connection is handled in a dedicated async task:
+//!
+//! 1. **Authentication**: First message must be `AuthenticateUser`
+//! 2. **Split**: WebSocket is split into reader and writer halves
+//! 3. **Reader**: Deserializes incoming messages, sends events to broker
+//! 4. **Writer**: Serializes broker responses, sends to client
+//! 5. **Cleanup**: When either half ends, both are dropped via `select!`
+//!
+//! # Architecture
+//!
+//! ```text
+//! WebSocket ←→ ws_half_reader → BrokerEvent → Broker
+//!     ↑                              ↓
+//!     └── ws_half_writer ← BrokerToClientMsg
+//! ```
+//!
+//! The reader and writer run concurrently using `tokio::select!`. When one
+//! finishes (e.g., client disconnects), the other is cancelled, ensuring
+//! clean resource cleanup.
+//!
+//! # Message Parsing
+//!
+//! - [`parse_authenticate`]: Validates the initial authentication message
+//! - [`parse_client_message`]: Converts incoming JSON to broker events
+//!
+//! # Error Handling
+//!
+//! Invalid messages are logged and the connection is closed gracefully.
+//! Authentication failures send an error response before closing.
+
 #[cfg(test)]
 mod connection_tests;
 

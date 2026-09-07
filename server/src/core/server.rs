@@ -1,3 +1,39 @@
+//! Server accept loop and connection spawning
+//!
+//! This module implements the main server loop that accepts incoming TCP
+//! connections and spawns a dedicated task for each client.
+//!
+//! # Responsibilities
+//!
+//! - Bind to TCP port and accept WebSocket connections
+//! - Initialize the broker for message routing
+//! - Spawn connection handler tasks for each client
+//! - Handle graceful shutdown on Ctrl+C signal
+//!
+//! # Graceful Shutdown
+//!
+//! When Ctrl+C is received, the server:
+//! 1. Stops accepting new connections
+//! 2. Signals all active connection tasks to abort
+//! 3. Waits for all tasks to complete
+//! 4. Exits cleanly
+//!
+//! # Example
+//!
+//! ```rust,no_run
+//! use tokio::net::TcpListener;
+//! use server::core::server;
+//! use server::auth::users::UserStore;
+//! use std::sync::Arc;
+//!
+//! #[tokio::main]
+//! async fn main() {
+//!     let listener = TcpListener::bind("0.0.0.0:1234").await.unwrap();
+//!     let user_store = Arc::new(UserStore::new());
+//!     server::run(listener, "logs", user_store).await.unwrap();
+//! }
+//! ```
+
 use super::broker;
 use super::connection;
 use crate::auth::users::UserStore;
