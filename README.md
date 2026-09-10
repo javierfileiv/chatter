@@ -1,6 +1,5 @@
 [![Rust CI](https://github.com/javierfileiv/chatter/actions/workflows/rust-ci.yml/badge.svg)](https://github.com/javierfileiv/chatter/actions/workflows/rust-ci.yml)
 [![Coverage](https://javierfileiv.github.io/chatter/badge.svg)](https://javierfileiv.github.io/chatter/)
-[![Docs](https://github.com/javierfileiv/chatter/actions/workflows/docs.yml/badge.svg)](https://javierfileiv.github.io/chatter/server/)
 
 # Chatter
 
@@ -140,10 +139,6 @@ No separate registration step is needed. The map is lost when the server restart
 | `client` | Terminal TUI client | `cursive`, `clap`, `chrono`, `tokio`, `tokio-tungstenite`, `futures-util`, `flexi_logger`, `cursive-flexi-logger-view` |
 
 ## Documentation
-
-API documentation is automatically generated and published to GitHub Pages on every push to main:
-
-📚 **[Online Documentation](https://javierfileiv.github.io/chatter/server/)**
 
 To generate documentation locally:
 
@@ -300,12 +295,11 @@ Tests cover: authentication, message broadcasting, room isolation, logout, and d
 
 ### CI Workflows
 
-Four GitHub Actions workflows run on push/PR to main/master:
+Three GitHub Actions workflows run on push/PR to main/master:
 
 - **rust-ci.yml** — builds, runs unit tests, checks formatting and clippy
 - **coverage.yml** — generates coverage report, deploys HTML to GitHub Pages
 - **integration.yml** — runs Python integration tests via `./scripts/test_integration.sh`
-- **docs.yml** — generates Rust documentation, deploys to GitHub Pages
 
 ### Known Gaps
 
