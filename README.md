@@ -1,6 +1,5 @@
 [![Rust CI](https://github.com/javierfileiv/chatter/actions/workflows/rust-ci.yml/badge.svg)](https://github.com/javierfileiv/chatter/actions/workflows/rust-ci.yml)
 [![Coverage](https://javierfileiv.github.io/chatter/badge.svg)](https://javierfileiv.github.io/chatter/)
-[![Docs](https://github.com/javierfileiv/chatter/actions/workflows/docs.yml/badge.svg)](https://javierfileiv.github.io/chatter/server/)
 
 # Chatter
 
@@ -140,10 +139,6 @@ No separate registration step is needed. The map is lost when the server restart
 | `client` | Terminal TUI client | `cursive`, `clap`, `chrono`, `tokio`, `tokio-tungstenite`, `futures-util`, `flexi_logger`, `cursive-flexi-logger-view` |
 
 ## Documentation
-
-API documentation is automatically generated and published to GitHub Pages on every push to main:
-
-📚 **[Online Documentation](https://javierfileiv.github.io/chatter/server/)**
 
 To generate documentation locally:
 
